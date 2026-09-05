@@ -7,8 +7,8 @@ def state_derivative(
     torque: float,
     params: PendulumParameters
 ) -> np.ndarray:
-    # state = [arm_angle, arm_angular_velocity,
-    #          pendulum_angle, pendulum_angular_velocity]
+    # state = [arm_angle, pendulum_angle,
+    #          arm_angular_velocity, pendulum_angular_velocity]
     # returns: [arm_angular_velocity, pendulum_angular_velocity,
     #           arm_angular_acceleration, pendulum_angular_acceleration]
     
