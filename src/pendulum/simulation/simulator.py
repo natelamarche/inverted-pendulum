@@ -27,7 +27,7 @@ class Simulator:
         torque: float
     ) -> np.ndarray:
         self.state = rk4_step(self.state, torque, self.dt, self.params)
-        return self.state.copu()
+        return self.state.copy()
         
     def get_state(
         self
