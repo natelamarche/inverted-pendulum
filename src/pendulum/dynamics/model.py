@@ -18,7 +18,7 @@ def state_derivative(
     br = params.arm_damping
 
     m = params.pendulum_mass
-    l = params.pendulum_com_length
+    lp = params.pendulum_com_length
     Jp = params.pendulum_com_inertia
     bp = params.pendulum_damping
 
@@ -29,18 +29,18 @@ def state_derivative(
 
     # Equations are defined using Euler-Lagrange equations on Lagrangian
 
-    A = Jr + m * r**2 + m * l**2 * sin_theta**2
+    A = Jr + m * r**2 + m * lp**2 * sin_theta**2
 
-    B = Jp + m * l**2
+    B = Jp + m * lp**2
 
-    C = m * r * l * cos_theta
+    C = m * r * lp * cos_theta
 
     h1 = (
-        2 * m * l**2 * sin_theta * cos_theta * theta_dot * phi_dot
-        - m * r * l * sin_theta * theta_dot**2
+        2 * m * lp**2 * sin_theta * cos_theta * theta_dot * phi_dot
+        - m * r * lp * sin_theta * theta_dot**2
     )
 
-    h2 = (-m) * l**2 * sin_theta * cos_theta * phi_dot**2 + m * g * l * sin_theta
+    h2 = (-m) * lp**2 * sin_theta * cos_theta * phi_dot**2 + m * g * lp * sin_theta
 
     R1 = torque - h1 - br * phi_dot
     R2 = -h2 - bp * theta_dot
