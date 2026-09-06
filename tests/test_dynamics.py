@@ -33,6 +33,39 @@ def test_arm_torque_accelerates_arm_and_couples_into_pendulum(
     assert theta_ddot < 0.0
 
 
+def test_pendulum_acceleration_changes_sign_with_theta(
+    pendulum_params: PendulumParameters,
+) -> None:
+    positive_theta = np.array([0.0, 0.4, 0.0, 0.0])
+    negative_theta = np.array([0.0, -0.4, 0.0, 0.0])
+
+    _, positive_theta_ddot = accelerations(
+        positive_theta, torque=0.0, params=pendulum_params
+    )
+    _, negative_theta_ddot = accelerations(
+        negative_theta, torque=0.0, params=pendulum_params
+    )
+
+    assert positive_theta_ddot < 0.0
+    assert negative_theta_ddot > 0.0
+    np.testing.assert_allclose(positive_theta_ddot, -negative_theta_ddot)
+
+
+def test_opposite_torques_produce_opposite_arm_accelerations(
+    pendulum_params: PendulumParameters,
+) -> None:
+    positive_phi_ddot, _ = accelerations(
+        np.zeros(4), torque=0.1, params=pendulum_params
+    )
+    negative_phi_ddot, _ = accelerations(
+        np.zeros(4), torque=-0.1, params=pendulum_params
+    )
+
+    assert positive_phi_ddot > 0.0
+    assert negative_phi_ddot < 0.0
+    np.testing.assert_allclose(positive_phi_ddot, -negative_phi_ddot)
+
+
 def test_gravity_accelerates_displaced_pendulum_toward_downward_position(
     pendulum_params: PendulumParameters,
 ) -> None:
@@ -41,3 +74,25 @@ def test_gravity_accelerates_displaced_pendulum_toward_downward_position(
     _, theta_ddot = accelerations(state, torque=0.0, params=pendulum_params)
 
     assert theta_ddot < 0.0
+
+
+def test_derivative_remains_finite_over_reasonable_states(
+    pendulum_params: PendulumParameters,
+) -> None:
+    states = [
+        np.array([0.0, 0.0, 0.0, 0.0]),
+        np.array([np.pi, -np.pi / 2, 2.0, -2.0]),
+        np.array([-np.pi, np.pi / 2, -5.0, 5.0]),
+        np.array([2 * np.pi, np.pi, 10.0, -10.0]),
+    ]
+    torques = [
+        -pendulum_params.motor_torque_limit,
+        0.0,
+        pendulum_params.motor_torque_limit,
+    ]
+
+    for state in states:
+        for torque in torques:
+            derivative = state_derivative(state, torque, pendulum_params)
+
+            assert np.all(np.isfinite(derivative))
