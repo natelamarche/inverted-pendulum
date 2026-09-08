@@ -21,7 +21,7 @@ def main():
     dt = 0.01
     sim = Simulator(params=params, dt=dt)
 
-    initial = np.array([0.0, np.pi * (90/180), 0.0, 0.0])
+    initial = np.array([0.0, np.pi * (160 / 180), 0.0, 0.0])
 
     sim.reset(initial)
 

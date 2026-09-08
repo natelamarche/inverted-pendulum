@@ -24,10 +24,9 @@ class Simulator:
 
     def step(self, torque: float) -> np.ndarray:
         torque = min(
-            max(torque, -self.params.motor_torque_limit), 
-            self.params.motor_torque_limit
+            max(torque, -self.params.motor_torque_limit), self.params.motor_torque_limit
         )
-        
+
         self.state = rk4_step(self.state, torque, self.dt, self.params)
         return self.state.copy()
 
