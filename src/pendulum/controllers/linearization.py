@@ -1,6 +1,8 @@
 from pendulum.dynamics.parameters import PendulumParameters
 from pendulum.dynamics.model import state_derivative
 
+from scipy.signal import cont2discrete
+
 import numpy as np
 
 
@@ -34,6 +36,20 @@ def linearize(
     return A, B
 
 
+def discretize(
+    A: np.ndarray, B: np.ndarray, dt: float
+) -> tuple[np.ndarray, np.ndarray]:
+    n = A.shape[0]
+    m = B.shape[1]
+
+    C = np.eye(n)
+    D = np.zeros((n, m))
+
+    A_d, B_d, _, _, _ = cont2discrete((A, B, C, D), dt, method="zoh")
+
+    return A_d, B_d
+
+
 def main():
     x_eq = np.array([0.0, np.pi, 0.0, 0.0])
     u_eq = 0.0
@@ -57,6 +73,12 @@ def main():
     rank = np.linalg.matrix_rank(controllability)
 
     print(rank)
+
+    A_d, B_d = discretize(A, B, 0.1)
+
+    print(A_d)
+
+    print(B_d)
 
 
 if __name__ == "__main__":
