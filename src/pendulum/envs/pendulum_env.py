@@ -6,7 +6,13 @@ from pendulum.simulation.simulator import Simulator
 
 
 class PendulumEnv(gym.Env):
-    def __init__(self, params: PendulumParameters, dt: float, max_episode_steps: int):
+    def __init__(
+        self,
+        params: PendulumParameters,
+        dt: float,
+        max_episode_steps: int,
+        theta_cutoff_error: float = np.pi / 2,
+    ):
         self.params: PendulumParameters = params
 
         # [phi, sin(theta), cos(theta), phi_dot, theta_dot]
@@ -27,6 +33,7 @@ class PendulumEnv(gym.Env):
 
         self.steps = 0
         self.max_episode_steps = max_episode_steps
+        self.theta_cutoff_error = theta_cutoff_error
 
         # [phi, theta, phi_dot, theta_dot]
         self.sample_distribution_factor = np.array([0.0, 0.0, 0.0, 0.0])
@@ -36,7 +43,6 @@ class PendulumEnv(gym.Env):
         self.simulator.reset(initial_state)
 
         self.state_error_reward_matrix = np.diag([1.0, 20.0, 0.1, 0.1])
-
         self.torque_error_reward = 4.0
 
     def reset(
@@ -66,7 +72,10 @@ class PendulumEnv(gym.Env):
 
         reward = self._get_reward(torque)
 
-        terminated = False
+        theta_error = self.simulator.get_state()[1] - self.state_e[1]
+        wrapped_theta_error = np.atan2(np.sin(theta_error), np.cos(theta_error))
+
+        terminated = bool(abs(wrapped_theta_error) > self.theta_cutoff_error)
 
         truncated = self.steps >= self.max_episode_steps
 
@@ -94,4 +103,8 @@ class PendulumEnv(gym.Env):
 
     def _sample_initial_state(self) -> np.ndarray:
         sample = self.np_random.normal(size=(4,)) * self.sample_distribution_factor
+        sample[1] = np.clip(
+            sample[1], -self.theta_cutoff_error, self.theta_cutoff_error
+        )
+
         return self.state_e + sample

@@ -33,6 +33,26 @@ def test_reset_is_seeded_and_resets_simulator(env: PendulumEnv) -> None:
     assert first_info == second_info == {}
 
 
+def test_reset_without_noise_starts_at_equilibrium(env: PendulumEnv) -> None:
+    observation, _ = env.reset()
+
+    np.testing.assert_allclose(env.simulator.get_state(), env.state_e)
+    np.testing.assert_allclose(
+        observation,
+        np.array([0.0, 0.0, -1.0, 0.0, 0.0], dtype=np.float32),
+        atol=1e-7,
+    )
+
+
+def test_sampled_theta_error_is_limited_by_cutoff(env: PendulumEnv) -> None:
+    env.sample_distribution_factor = np.array([0.0, 100.0, 0.0, 0.0])
+
+    env.reset(seed=1)
+
+    theta_error = env.simulator.get_state()[1] - env.state_e[1]
+    assert abs(theta_error) <= env.theta_cutoff_error
+
+
 def test_observation_represents_simulator_state(env: PendulumEnv) -> None:
     state = np.array([0.25, -0.75, 1.5, -2.0])
     env.simulator.reset(state)
@@ -65,8 +85,45 @@ def test_episode_truncates_at_exact_step_limit(env: PendulumEnv) -> None:
         _, _, terminated, truncated, _ = env.step(np.array([0.0], dtype=np.float32))
 
         assert env.steps == expected_steps
-        assert terminated is False
+        assert not terminated
         assert truncated is (expected_steps == env.max_episode_steps)
+
+
+@pytest.mark.parametrize(
+    ("theta_error", "expected_terminated"),
+    [
+        (0.5, False),
+        (1.0, False),
+        (1.01, True),
+        (-1.01, True),
+    ],
+)
+def test_episode_termination_uses_theta_cutoff(
+    pendulum_params: PendulumParameters,
+    theta_error: float,
+    expected_terminated: bool,
+) -> None:
+    env = PendulumEnv(
+        params=pendulum_params,
+        dt=0.01,
+        max_episode_steps=3,
+        theta_cutoff_error=1.0,
+    )
+    env.simulator.reset(env.state_e + np.array([0.0, theta_error, 0.0, 0.0]))
+
+    with patch.object(env.simulator, "step"):
+        _, _, terminated, _, _ = env.step(np.array([0.0], dtype=np.float32))
+
+    assert bool(terminated) is expected_terminated
+
+
+def test_termination_is_periodic_in_pendulum_angle(env: PendulumEnv) -> None:
+    env.simulator.reset(np.array([0.0, -np.pi, 0.0, 0.0]))
+
+    with patch.object(env.simulator, "step"):
+        _, _, terminated, _, _ = env.step(np.array([0.0], dtype=np.float32))
+
+    assert not terminated
 
 
 def test_reward_is_periodic_in_pendulum_angle(env: PendulumEnv) -> None:
