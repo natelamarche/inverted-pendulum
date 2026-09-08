@@ -1,6 +1,7 @@
 from pendulum.dynamics.parameters import PendulumParameters
 from pendulum.simulation.simulator import Simulator
 from pendulum.simulation.visualtization import plot_state_history
+from pendulum.controllers.lqr import LQRController
 
 import numpy as np
 
@@ -17,13 +18,26 @@ def main():
         motor_torque_limit=0.5,
     )
 
-    dt = 0.1
-
+    dt = 0.01
     sim = Simulator(params=params, dt=dt)
 
-    initial = np.array([0.0, 0.0, 0.0, 0.1])
+    initial = np.array([0.0, np.pi + 0.05, 0.0, 0.0])
 
     sim.reset(initial)
+
+    Q = np.array(
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 20.0, 0.0, 0.0],
+            [0.0, 0.0, 0.1, 0.0],
+            [0.0, 0.0, 0.0, 0.1],
+        ]
+    )
+
+    R = np.array([[4.0]])
+
+    control_stride = 10
+    controller = LQRController(params=params, Q=Q, R=R, dt=dt * control_stride)
 
     time = 10.0
     timestamps = int(round(time / dt))
@@ -31,8 +45,10 @@ def main():
     state_history = np.empty((timestamps, 4))
     time_history = np.empty(timestamps)
 
-    torque = 0.1
     for i, _ in enumerate(range(timestamps)):
+        if i % control_stride == 0:
+            torque = controller.get_discrete_action(sim.get_state())
+
         state_history[i, :] = sim.step(torque=torque)
         time_history[i] = i * dt
 
