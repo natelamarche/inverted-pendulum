@@ -102,6 +102,10 @@ class RolloutBuffer:
 
         self.returns = self.advantages + self.values
 
+        self.advantages[: self.pos] = (
+            self.advantages[: self.pos] - self.advantages[: self.pos].mean()
+        ) / (self.advantages[: self.pos].std() + 1e-8)
+
     def get_batches(
         self,
         batch_size: int,
