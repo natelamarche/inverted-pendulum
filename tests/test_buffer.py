@@ -119,7 +119,10 @@ def test_compute_returns_and_advantages_handles_episode_boundaries() -> None:
 
     buffer.compute_returns_and_advantages()
 
-    expected_advantages = np.array([2.048, 1.4, 5.9072, 4.01])
+    raw_advantages = np.array([2.048, 1.4, 5.9072, 4.01])
+    expected_advantages = (raw_advantages - raw_advantages.mean()) / (
+        raw_advantages.std() + 1e-8
+    )
     expected_returns = np.array([2.548, 2.0, 6.6072, 4.81])
     np.testing.assert_allclose(buffer.advantages, expected_advantages, rtol=1e-6)
     np.testing.assert_allclose(buffer.returns, expected_returns, rtol=1e-6)
@@ -131,8 +134,21 @@ def test_compute_returns_and_advantages_includes_final_transition() -> None:
 
     buffer.compute_returns_and_advantages()
 
-    np.testing.assert_allclose(buffer.advantages, [2.4])
+    # A single advantage normalizes to zero; its return retains the raw GAE.
+    np.testing.assert_allclose(buffer.advantages, [0.0])
     np.testing.assert_allclose(buffer.returns, [2.9])
+
+
+def test_advantage_normalization_uses_only_populated_entries() -> None:
+    buffer = make_buffer(buffer_size=4)
+    for index, reward in enumerate([1.5, 3.5]):
+        add_transition(buffer, index, reward=reward, value=0.5, terminated=True)
+
+    buffer.compute_returns_and_advantages()
+
+    # Raw advantages [1, 3] normalize independently of the two unused slots.
+    np.testing.assert_allclose(buffer.advantages, [-1.0, 1.0, 0.0, 0.0])
+    np.testing.assert_allclose(buffer.returns, [1.5, 3.5, 0.0, 0.0])
 
 
 def test_get_batches_returns_each_populated_transition_once() -> None:
