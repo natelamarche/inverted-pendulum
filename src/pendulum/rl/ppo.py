@@ -115,7 +115,7 @@ class PPO:
             - self.entropy_coef * (entropies).mean()
         )
 
-    def train(self):
+    def train_iteration(self):
         self.simulate()
 
         for epoch in range(self.epochs):
