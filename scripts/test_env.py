@@ -37,9 +37,7 @@ def main():
         time_history[i] = i * dt
 
         if terminated or truncated:
-            print(
-                f"{'Terminated' if terminated else 'Truncated'} at i={i}"
-            )
+            print(f"{'Terminated' if terminated else 'Truncated'} at i={i}")
             obs, info = env.reset()
 
     plot_state_history(time_history, state_history)
