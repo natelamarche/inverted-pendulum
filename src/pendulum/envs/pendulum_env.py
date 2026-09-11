@@ -11,7 +11,8 @@ class PendulumEnv(gym.Env):
         params: PendulumParameters,
         dt: float,
         max_episode_steps: int,
-        theta_cutoff_error: float = np.pi / 2,
+        sample_distribution_factor: np.ndarray,
+        theta_cutoff_error: float = np.pi / 2
     ):
         self.params: PendulumParameters = params
 
@@ -36,7 +37,7 @@ class PendulumEnv(gym.Env):
         self.theta_cutoff_error = theta_cutoff_error
 
         # [phi, theta, phi_dot, theta_dot]
-        self.sample_distribution_factor = np.array([0.0, 0.0, 0.0, 0.0])
+        self.sample_distribution_factor = sample_distribution_factor
         initial_state: np.ndarray = self._sample_initial_state()
 
         self.simulator = Simulator(self.params, dt)
