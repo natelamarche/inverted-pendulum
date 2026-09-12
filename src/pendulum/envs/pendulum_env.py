@@ -51,7 +51,13 @@ class PendulumEnv(gym.Env):
     ) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
 
-        initial_state = self._sample_initial_state()
+        if options is not None and "initial_state" in options:
+            initial_state = np.asarray(options["initial_state"], dtype=float)
+            if initial_state.shape != (4,) or not np.all(np.isfinite(initial_state)):
+                raise ValueError("initial_state must contain four finite values")
+        else:
+            initial_state = self._sample_initial_state()
+            
         self.simulator.reset(initial_state)
 
         observation = self._get_observation()
