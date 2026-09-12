@@ -1,7 +1,11 @@
+import csv
+from pathlib import Path
+
 from pendulum.envs.pendulum_env import PendulumEnv
 from pendulum.dynamics.parameters import PendulumParameters
 from pendulum.rl.ppo import PPO
 from pendulum.rl.policy import ActorCritic
+from pendulum.rl.evaluation import evaluate_policy
 
 from stable_baselines3.common.env_checker import check_env
 
@@ -22,11 +26,11 @@ def make_env() -> PendulumEnv:
     )
 
     env = PendulumEnv(
-        params=params, 
-        dt=0.01, 
-        max_episode_steps=500, 
+        params=params,
+        dt=0.01,
+        max_episode_steps=500,
         theta_cutoff_error=np.pi / 2,
-        sample_distribution_factor=np.array([0.02, 0.05, 0.05, 0.10])
+        sample_distribution_factor=np.array([0.02, 0.05, 0.05, 0.10]),
     )
 
     check_env(env)
@@ -35,10 +39,13 @@ def make_env() -> PendulumEnv:
 
 
 def main():
-    env: PendulumEnv = make_env()
+    env = make_env()
+    eval_env = make_env()
+    output_dir = Path("models")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     policy = ActorCritic(5, 1)
-    
+
     ppo = PPO(
         env=env,
         policy=policy,
@@ -50,29 +57,77 @@ def main():
         entropy_coef=0.001,
         rollout_steps=8192,
         batch_size=64,
-        epochs=5
+        epochs=5,
     )
-    
+
     total_timesteps = 1_000_000
     timesteps = 0
     iterations = 0
-    
+    eval_every_iterations = 4
+    best_score = None
+
+    def record_evaluation(writer, metrics_file):
+        nonlocal best_score
+        metrics = evaluate_policy(policy, eval_env)
+        writer.writerow({"timesteps": timesteps, **metrics})
+        metrics_file.flush()
+        print(
+            f"Evaluation at {timesteps:,} steps: "
+            f"return={metrics['mean_return']:.2f}, "
+            f"length={metrics['mean_episode_steps']:.1f} steps "
+            f"({metrics['mean_episode_seconds']:.2f}s), "
+            f"survival={metrics['survival_rate']:.0%}, "
+            f"angle RMSE={metrics['angle_rmse_rad']:.4f} rad, "
+            f"torque RMS={metrics['torque_rms_nm']:.4f} Nm"
+        )
+
+        score = (
+            metrics["survival_rate"],
+            metrics["mean_episode_steps"],
+            -metrics["angle_rmse_rad"],
+        )
+        if best_score is None or score > best_score:
+            best_score = score
+            ppo.save(output_dir / "rl_controller_best.pth")
+
     try:
-        while timesteps < total_timesteps:
-            ppo.train_iteration()
-            timesteps += ppo.rollout_steps
-            iterations += 1
-            
-            print(f"Iteration: {iteration}: {timesteps:,} steps")
-            
-            if iteration % 25 == 0:
-                ppo.save("models/rl_controller_latest.ph")
-        ppo.save("models/rl_controller.ph")
+        with (output_dir / "evaluation.csv").open("w", newline="") as metrics_file:
+            writer = csv.DictWriter(
+                metrics_file,
+                fieldnames=[
+                    "timesteps",
+                    "mean_return",
+                    "mean_episode_steps",
+                    "mean_episode_seconds",
+                    "survival_rate",
+                    "angle_rmse_rad",
+                    "torque_rms_nm",
+                ],
+            )
+            writer.writeheader()
+            record_evaluation(writer, metrics_file)
+            while timesteps < total_timesteps:
+                ppo.train_iteration()
+                timesteps += ppo.rollout_steps
+                iterations += 1
+
+                print(f"Iteration: {iterations}: {timesteps:,} steps")
+
+                if (
+                    iterations % eval_every_iterations == 0
+                    or timesteps >= total_timesteps
+                ):
+                    record_evaluation(writer, metrics_file)
+                if iterations % 25 == 0:
+                    ppo.save(output_dir / "rl_controller_latest.pth")
+        ppo.save(output_dir / "rl_controller.pth")
     finally:
-        env.close()    
-    
-    print(f"Done:") 
+        env.close()
+        eval_env.close()
+
+    print("Done:")
     print(f"Iterations: {iterations}: {timesteps:,} steps")
+
 
 if __name__ == "__main__":
     main()
