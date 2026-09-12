@@ -10,7 +10,7 @@ from pendulum.rl.policy import ActorCritic
 def evaluate_policy(
     policy: ActorCritic,
     env: PendulumEnv,
-    seeds: Sequence[int] = tuple(range(10_000, 10_010))
+    seeds: Sequence[int] = tuple(range(10_000, 10_010)),
 ) -> dict[str, float]:
     if len(seeds) == 0:
         raise ValueError("Evaluation requires at least one seed")
@@ -59,5 +59,5 @@ def evaluate_policy(
         "mean_episode_seconds": float(np.mean(lengths) * env.simulator.dt),
         "survival_rate": survivors / len(seeds),
         "angle_rmse_rad": float(np.sqrt(angle_squared_sum / steps)),
-        "torque_rms_nm": float(np.sqrt(torque_squared_sum / steps))
+        "torque_rms_nm": float(np.sqrt(torque_squared_sum / steps)),
     }
