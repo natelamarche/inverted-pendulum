@@ -56,7 +56,7 @@ def evaluate_policy(
     return {
         "mean_return": float(np.mean(returns)),
         "mean_episode_steps": float(np.mean(lengths)),
-        "mean_episode_seconds": float(np.mean(lengths) * env.simulator.dt),
+        "mean_episode_seconds": float(np.mean(lengths) * env.dt),
         "survival_rate": survivors / len(seeds),
         "angle_rmse_rad": float(np.sqrt(angle_squared_sum / steps)),
         "torque_rms_nm": float(np.sqrt(torque_squared_sum / steps)),
