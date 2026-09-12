@@ -24,7 +24,7 @@ class PendulumViewer:
         self.env = env
         self.controller = controller
         self.seed = seed
-        self.paused = False
+        self.paused = True
         self.done = False
         self.speed = 1.0
         self._budget = 0.0
@@ -34,10 +34,10 @@ class PendulumViewer:
         self.scene = self.figure.add_subplot(grid[:, 0], projection="3d")
         self.angle_axes = self.figure.add_subplot(grid[0, 1])
         self.torque_axes = self.figure.add_subplot(grid[1, 1])
-        self.figure.subplots_adjust(bottom=0.22, top=0.87, wspace=0.3)
+        self.figure.subplots_adjust(bottom=0.25, top=0.87, wspace=0.3, hspace=0.5)
         self.figure.suptitle("Rotary pendulum · controller inspection")
 
-        reach = (env.params.arm_length + env.params.pendulum_com_length) * 1.2
+        reach = max(env.params.arm_length, env.params.pendulum_com_length) * 1.2
         self.scene.set(
             xlim=(-reach, reach),
             ylim=(-reach, reach),
@@ -68,7 +68,7 @@ class PendulumViewer:
             axes.axhline(0, color="0.6", lw=0.7)
         self.status = self.figure.text(0.08, 0.13, "", family="monospace")
         self.pause_button = Button(
-            self.figure.add_axes((0.08, 0.04, 0.12, 0.05)), "Pause"
+            self.figure.add_axes((0.08, 0.04, 0.12, 0.05)), "Start"
         )
         self.step_button = Button(
             self.figure.add_axes((0.22, 0.04, 0.12, 0.05)), "Step"
@@ -84,6 +84,29 @@ class PendulumViewer:
             valinit=1.0,
             valfmt="%1.1fx",
         )
+        self.env.reset(seed=self.seed)
+        initial = self.env.simulator.get_state()
+        arm_angle = np.rad2deg(np.arctan2(np.sin(initial[0]), np.cos(initial[0])))
+        error = initial[1] - np.pi
+        tilt = np.rad2deg(np.arctan2(np.sin(error), np.cos(error)))
+        self.arm_slider = Slider(
+            self.figure.add_axes((0.62, 0.15, 0.27, 0.025)),
+            "Initial arm (deg)",
+            -180,
+            180,
+            valinit=arm_angle,
+            valfmt="%.1f°",
+        )
+        self.tilt_slider = Slider(
+            self.figure.add_axes((0.62, 0.10, 0.27, 0.025)),
+            "Initial tilt (deg)",
+            -180,
+            180,
+            valinit=tilt,
+            valfmt="%.1f°",
+        )
+        self.arm_slider.on_changed(self.reset)
+        self.tilt_slider.on_changed(self.reset)
         self.pause_button.on_clicked(self._toggle_pause)
         self.step_button.on_clicked(self._single_step)
         self.reset_button.on_clicked(self.reset)
@@ -98,7 +121,19 @@ class PendulumViewer:
         )
 
     def reset(self, event=None):
-        self.observation, _ = self.env.reset(seed=self.seed)
+        initial_state = np.array(
+            [
+                np.deg2rad(self.arm_slider.val),
+                np.pi + np.deg2rad(self.tilt_slider.val),
+                0.0,
+                0.0,
+            ]
+        )
+        self.observation, _ = self.env.reset(
+            seed=self.seed, options={"initial_state": initial_state}
+        )
+        self.paused = True
+        self.pause_button.label.set_text("Start")
         self.done = False
         self._budget = 0.0
         self.episode_return = 0.0
