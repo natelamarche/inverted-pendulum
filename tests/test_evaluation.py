@@ -18,7 +18,7 @@ def test_evaluation_metrics_and_terminal_step(pendulum_params, terminated):
         sample_range_lower=np.zeros(4),
         sample_range_upper=np.zeros(4),
     )
-    policy = ActorCritic(5, 1)
+    policy = ActorCritic(6, 1)
     with torch.no_grad():
         for parameter in policy.actor.parameters():
             parameter.zero_()
@@ -56,7 +56,7 @@ def test_evaluation_is_repeatable_without_consuming_torch_rng(pendulum_params):
         sample_range_lower=np.zeros(4),
         sample_range_upper=np.array([0.02, 0.05, 0.05, 0.1]),
     )
-    policy = ActorCritic(5, 1)
+    policy = ActorCritic(6, 1)
     policy.eval()
     rng_state = torch.get_rng_state().clone()
     first = evaluate_policy(policy, env, seeds=[10, 11])
@@ -68,4 +68,4 @@ def test_evaluation_is_repeatable_without_consuming_torch_rng(pendulum_params):
 
 def test_evaluation_rejects_empty_seeds():
     with pytest.raises(ValueError, match="at least one seed"):
-        evaluate_policy(ActorCritic(5, 1), None, seeds=[])
+        evaluate_policy(ActorCritic(6, 1), None, seeds=[])
