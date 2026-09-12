@@ -36,13 +36,14 @@ class PendulumEnv(gym.Env):
         self.steps = 0
         self.max_episode_steps = max_episode_steps
         self.theta_cutoff_error = theta_cutoff_error
+        self.flag_captured = False
 
         # [phi, theta, phi_dot, theta_dot]
         self.sample_range_lower = sample_range_lower
         self.sample_range_upper = sample_range_upper
         initial_state: np.ndarray = self._sample_initial_state()
 
-        self.controller_stride = 10
+        self.controller_stride = 1
         self.dt = dt
         self.simulator = Simulator(self.params, self.dt / self.controller_stride)
         self.simulator.reset(initial_state)
@@ -67,7 +68,8 @@ class PendulumEnv(gym.Env):
         observation = self._get_observation()
 
         self.steps = 0
-
+        self.flag_captured = False
+        
         return observation, {}
 
     def step(
@@ -80,19 +82,22 @@ class PendulumEnv(gym.Env):
             self.simulator.step(torque)
 
         self.steps += 1
-
+        
         observation = self._get_observation()
 
         assert np.all(np.isfinite(observation))
 
         theta_error = self.simulator.get_state()[1] - self.state_e[1]
-        wrapped_theta_error = np.atan2(np.sin(theta_error), np.cos(theta_error))
+        theta_error = np.atan2(np.sin(theta_error), np.cos(theta_error))
+        
+        if abs(theta_error) < np.pi / 16:
+            self.flag_captured = True
 
         terminated = bool(
-            abs(wrapped_theta_error) > self.theta_cutoff_error
-            or abs(observation[0]) > 1
+            (abs(theta_error) > self.theta_cutoff_error and self.flag_captured) or
+            abs(observation[0]) > 1
         )
-
+        
         truncated = self.steps >= self.max_episode_steps
 
         reward = self._get_reward(torque) - (1_000_000 if terminated else 0)
@@ -127,13 +132,17 @@ class PendulumEnv(gym.Env):
         return -(state_reward + torque_reward)
 
     def _sample_initial_state(self) -> np.ndarray:
-        sample = (
-            self.np_random.random(size=(4,))
-            * (self.sample_range_upper - self.sample_range_lower)
-            + self.sample_range_lower
-        ) * self.np_random.choice([-1, 1], size=4)
-        sample[1] = np.clip(
-            sample[1], -self.theta_cutoff_error, self.theta_cutoff_error
-        )
-
+        
+        if self.np_random.choice([True, False]):
+            sample = (
+                self.np_random.random(size=(4,))
+                * (self.sample_range_upper - self.sample_range_lower)
+                + self.sample_range_lower
+            ) * self.np_random.choice([-1, 1], size=4)
+        else:
+            sample = (
+                self.np_random.random(size=(4,))
+                * np.array([0.1, np.pi / 16, 0.1, 0.2])
+            ) * self.np_random.choice([-1, 1], size=4)
+        
         return self.state_e + sample
