@@ -1,4 +1,6 @@
 import csv
+import argparse
+
 from pathlib import Path
 
 from pendulum.envs.pendulum_env import PendulumEnv
@@ -28,10 +30,10 @@ def make_env() -> PendulumEnv:
     env = PendulumEnv(
         params=params,
         dt=0.01,
-        max_episode_steps=500,
-        theta_cutoff_error=2 * np.pi,
-        sample_range_lower=np.array([0.0, np.pi / 2, 0.0, 0.0]),
-        sample_range_upper=np.array([np.pi, 3 * np.pi / 2, 0.1, 0.2]),
+        max_episode_steps=1000,
+        theta_cutoff_error= np.pi,
+        sample_range_lower= np.array([0.0, 0.0, 0.0, 0.0]),
+        sample_range_upper= np.array([0.1, np.pi / 2, 0.1, 0.2]),
     )
 
     check_env(env)
@@ -40,18 +42,28 @@ def make_env() -> PendulumEnv:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="RL Controller trainer")
+    parser.add_argument(
+        "--checkpoint", type=Path, default=None
+    )
+    args = parser.parse_args()
+    if args.checkpoint is not None and not args.checkpoint.is_file():
+        parser.error(
+            f"Checkpoint not found: {args.checkpoint}."
+        )
+    
     env = make_env()
     eval_env = make_env()
     output_dir = Path("models")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    policy = ActorCritic(5, 1)
-
+    policy = ActorCritic(5, 1)    
+    
     ppo = PPO(
         env=env,
         policy=policy,
         learning_rate=3e-4,
-        gamma=0.99,
+        gamma=0.999,
         gae_lambda=0.95,
         clip_epsilon=0.2,
         value_coef=1.0,
@@ -60,6 +72,9 @@ def main():
         batch_size=64,
         epochs=5,
     )
+
+    if args.checkpoint is not None:
+        ppo.load(args.checkpoint)
 
     total_timesteps = 1_000_000
     timesteps = 0
