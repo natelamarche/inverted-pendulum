@@ -62,8 +62,14 @@ class PendulumViewer:
         (self.angle_line,) = self.angle_axes.plot([], [], color="tab:orange")
         (self.torque_line,) = self.torque_axes.plot([], [], color="tab:blue")
         self.angle_axes.set(ylabel="Upright error (deg)", xlabel="Time (s)")
-        self.torque_axes.set(ylabel="Motor torque (Nm)", xlabel="Time (s)")
+        torque_extent = 1.1 * env.params.motor_torque_limit
+        self.torque_axes.set(
+            ylabel="Motor torque (Nm)",
+            xlabel="Time (s)",
+            ylim=(-torque_extent, torque_extent),
+        )
         for axes in (self.angle_axes, self.torque_axes):
+            axes.set_xlim(0, env.max_episode_steps * env.dt)
             axes.grid(alpha=0.3)
             axes.axhline(0, color="0.6", lw=0.7)
         self.status = self.figure.text(0.08, 0.13, "", family="monospace")
@@ -146,7 +152,7 @@ class PendulumViewer:
         theta = self.env.simulator.get_state()[1]
         error = np.arctan2(np.sin(theta - np.pi), np.cos(theta - np.pi))
         self.history.append(
-            (self.env.steps * self.env.simulator.dt, np.rad2deg(error), torque)
+            (self.env.steps * self.env.dt, np.rad2deg(error), torque)
         )
 
     def advance(self):
@@ -187,9 +193,9 @@ class PendulumViewer:
     def _tick(self, frame):
         if not self.paused and not self.done:
             self._budget += self.speed / 30
-            while self._budget + 1e-12 >= self.env.simulator.dt and not self.done:
+            while self._budget + 1e-12 >= self.env.dt and not self.done:
                 self.advance()
-                self._budget -= self.env.simulator.dt
+                self._budget -= self.env.dt
         self._draw()
 
     def _draw(self):
@@ -203,7 +209,7 @@ class PendulumViewer:
         ):
             line.set_data(history[:, 0], history[:, column])
             axes.relim()
-            axes.autoscale_view()
+            axes.autoscale_view(scalex=False)
         state = self.env.simulator.get_state()
         label = self.outcome if self.done else "Paused" if self.paused else "Running"
         self.status.set_text(
