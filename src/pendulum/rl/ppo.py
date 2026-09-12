@@ -143,7 +143,12 @@ class PPO:
                 self.optimizer.zero_grad()
                 loss.backward()
 
-                torch.nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm=0.5)
+                actor_parameters = [
+                    *self.policy.actor.parameters(),
+                    self.policy.log_std,
+                ]
+                torch.nn.utils.clip_grad_norm_(actor_parameters, max_norm=0.5)
+                torch.nn.utils.clip_grad_norm_(self.policy.critic.parameters(), max_norm=0.5)
 
                 self.optimizer.step()
 
