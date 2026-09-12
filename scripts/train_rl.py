@@ -96,7 +96,7 @@ def main():
         score = (
             metrics["survival_rate"],
             metrics["mean_episode_steps"],
-            -metrics["angle_rmse_rad"],
+            metrics["mean_return"],
         )
         if best_score is None or score > best_score:
             best_score = score
