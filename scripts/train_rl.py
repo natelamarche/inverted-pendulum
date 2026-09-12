@@ -29,8 +29,9 @@ def make_env() -> PendulumEnv:
         params=params,
         dt=0.01,
         max_episode_steps=500,
-        theta_cutoff_error=np.pi / 2,
-        sample_distribution_factor=np.array([0.02, 0.05, 0.05, 0.10]),
+        theta_cutoff_error=2 * np.pi,
+        sample_range_lower=np.array([0.0, np.pi / 2, 0.0, 0.0]),
+        sample_range_upper=np.array([np.pi, 3 * np.pi / 2, 0.1, 0.2]),
     )
 
     check_env(env)

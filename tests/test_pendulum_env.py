@@ -14,24 +14,30 @@ def env(pendulum_params: PendulumParameters) -> PendulumEnv:
         params=pendulum_params,
         dt=0.01,
         max_episode_steps=3,
-        sample_distribution_factor=np.zeros(4),
+        sample_range_lower=np.zeros(4),
+        sample_range_upper=np.zeros(4),
     )
 
 
 def test_env_passes_gymnasium_checker(env: PendulumEnv) -> None:
+    env.sample_range_upper = np.array([0.1, 0.2, 0.3, 0.4])
     check_env(env, skip_render_check=True)
 
 
 def test_reset_is_seeded_and_resets_simulator(env: PendulumEnv) -> None:
-    env.sample_distribution_factor = np.array([0.1, 0.2, 0.3, 0.4])
+    env.sample_range_lower = np.array([0.01, 0.02, 0.03, 0.04])
+    env.sample_range_upper = np.array([0.1, 0.2, 0.3, 0.4])
 
-    first_observation, first_info = env.reset(seed=123)
-    env.step(np.array([0.5], dtype=np.float32))
-    second_observation, second_info = env.reset(seed=123)
+    for seed in range(10):
+        first_observation, first_info = env.reset(seed=seed)
+        first_state = env.simulator.get_state().copy()
+        env.step(np.array([0.5], dtype=np.float32))
+        second_observation, second_info = env.reset(seed=seed)
 
-    np.testing.assert_array_equal(second_observation, first_observation)
-    assert env.steps == 0
-    assert first_info == second_info == {}
+        np.testing.assert_array_equal(second_observation, first_observation)
+        np.testing.assert_array_equal(env.simulator.get_state(), first_state)
+        assert env.steps == 0
+        assert first_info == second_info == {}
 
 
 def test_reset_without_noise_starts_at_equilibrium(env: PendulumEnv) -> None:
@@ -46,12 +52,34 @@ def test_reset_without_noise_starts_at_equilibrium(env: PendulumEnv) -> None:
 
 
 def test_sampled_theta_error_is_limited_by_cutoff(env: PendulumEnv) -> None:
-    env.sample_distribution_factor = np.array([0.0, 100.0, 0.0, 0.0])
+    env.sample_range_lower = np.array([0.0, 10.0, 0.0, 0.0])
+    env.sample_range_upper = np.array([0.0, 100.0, 0.0, 0.0])
 
     env.reset(seed=1)
 
     theta_error = env.simulator.get_state()[1] - env.state_e[1]
-    assert abs(theta_error) <= env.theta_cutoff_error
+    assert abs(theta_error) == pytest.approx(env.theta_cutoff_error)
+
+
+def test_sampling_covers_signed_ranges_around_equilibrium(env: PendulumEnv) -> None:
+    env.sample_range_lower = np.array([0.1, 0.2, 0.3, 0.4])
+    env.sample_range_upper = np.array([0.5, 0.6, 0.7, 0.8])
+    env.reset(seed=123)
+
+    errors = []
+    for _ in range(128):
+        env.reset()
+        errors.append(env.simulator.get_state() - env.state_e)
+    errors = np.array(errors)
+    magnitudes = np.abs(errors)
+
+    assert np.all(magnitudes >= env.sample_range_lower - 1e-12)
+    assert np.all(magnitudes <= env.sample_range_upper + 1e-12)
+    # Catch collapsed ranges and signs shared across all state components.
+    midpoint = (env.sample_range_lower + env.sample_range_upper) / 2
+    assert np.all(np.any(magnitudes < midpoint, axis=0))
+    assert np.all(np.any(magnitudes > midpoint, axis=0))
+    assert len(np.unique(np.sign(errors), axis=0)) == 16
 
 
 def test_observation_represents_simulator_state(env: PendulumEnv) -> None:
@@ -108,7 +136,8 @@ def test_episode_termination_uses_theta_cutoff(
         params=pendulum_params,
         dt=0.01,
         max_episode_steps=3,
-        sample_distribution_factor=np.zeros(4),
+        sample_range_lower=np.zeros(4),
+        sample_range_upper=np.zeros(4),
         theta_cutoff_error=1.0,
     )
     env.simulator.reset(env.state_e + np.array([0.0, theta_error, 0.0, 0.0]))

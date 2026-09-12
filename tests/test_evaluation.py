@@ -15,7 +15,8 @@ def test_evaluation_metrics_and_terminal_step(pendulum_params, terminated):
         params=pendulum_params,
         dt=0.01,
         max_episode_steps=2,
-        sample_distribution_factor=np.zeros(4),
+        sample_range_lower=np.zeros(4),
+        sample_range_upper=np.zeros(4),
     )
     policy = ActorCritic(5, 1)
     with torch.no_grad():
@@ -52,7 +53,8 @@ def test_evaluation_is_repeatable_without_consuming_torch_rng(pendulum_params):
         params=pendulum_params,
         dt=0.01,
         max_episode_steps=3,
-        sample_distribution_factor=np.array([0.02, 0.05, 0.05, 0.1]),
+        sample_range_lower=np.zeros(4),
+        sample_range_upper=np.array([0.02, 0.05, 0.05, 0.1]),
     )
     policy = ActorCritic(5, 1)
     policy.eval()

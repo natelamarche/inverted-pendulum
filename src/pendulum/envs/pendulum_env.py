@@ -11,7 +11,8 @@ class PendulumEnv(gym.Env):
         params: PendulumParameters,
         dt: float,
         max_episode_steps: int,
-        sample_distribution_factor: np.ndarray,
+        sample_range_lower: np.ndarray,
+        sample_range_upper: np.ndarray,
         theta_cutoff_error: float = np.pi / 2,
     ):
         self.params: PendulumParameters = params
@@ -37,7 +38,8 @@ class PendulumEnv(gym.Env):
         self.theta_cutoff_error = theta_cutoff_error
 
         # [phi, theta, phi_dot, theta_dot]
-        self.sample_distribution_factor = sample_distribution_factor
+        self.sample_range_lower = sample_range_lower
+        self.sample_range_upper = sample_range_upper
         initial_state: np.ndarray = self._sample_initial_state()
 
         self.simulator = Simulator(self.params, dt)
@@ -57,7 +59,7 @@ class PendulumEnv(gym.Env):
                 raise ValueError("initial_state must contain four finite values")
         else:
             initial_state = self._sample_initial_state()
-            
+
         self.simulator.reset(initial_state)
 
         observation = self._get_observation()
@@ -109,7 +111,11 @@ class PendulumEnv(gym.Env):
         return -(state_reward + torque_reward)
 
     def _sample_initial_state(self) -> np.ndarray:
-        sample = self.np_random.normal(size=(4,)) * self.sample_distribution_factor
+        sample = (
+            self.np_random.random(size=(4,))
+            * (self.sample_range_upper - self.sample_range_lower)
+            + self.sample_range_lower
+        ) * self.np_random.choice([-1, 1], size=4)
         sample[1] = np.clip(
             sample[1], -self.theta_cutoff_error, self.theta_cutoff_error
         )
