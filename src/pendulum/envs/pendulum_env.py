@@ -12,7 +12,7 @@ class PendulumEnv(gym.Env):
         dt: float,
         max_episode_steps: int,
         sample_distribution_factor: np.ndarray,
-        theta_cutoff_error: float = np.pi / 2
+        theta_cutoff_error: float = np.pi / 2,
     ):
         self.params: PendulumParameters = params
 
