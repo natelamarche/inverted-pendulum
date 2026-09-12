@@ -16,7 +16,7 @@ class RLController(Controller):
     @classmethod
     def from_checkpoint(cls, path: str | Path) -> "RLController":
         checkpoint = torch.load(path, map_location="cpu", weights_only=True)
-        policy = ActorCritic(observation_dim=5, action_dim=1)
+        policy = ActorCritic(observation_dim=6, action_dim=1)
         policy.load_state_dict(checkpoint["policy_state_dict"])
         return cls(policy)
 

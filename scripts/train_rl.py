@@ -31,9 +31,9 @@ def make_env() -> PendulumEnv:
         params=params,
         dt=0.01,
         max_episode_steps=1000,
-        theta_cutoff_error=np.pi,
-        sample_range_lower=np.array([0.0, 0.0, 0.0, 0.0]),
-        sample_range_upper=np.array([0.1, np.pi / 2, 0.1, 0.2]),
+        theta_cutoff_error=np.pi / 4,
+        sample_range_lower=np.array([0.0, np.pi / 2, 0.0, 0.0]),
+        sample_range_upper=np.array([0.1, np.pi, 0.1, 0.2]),
     )
 
     check_env(env)
@@ -53,7 +53,7 @@ def main():
     output_dir = Path("models")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    policy = ActorCritic(5, 1)
+    policy = ActorCritic(6, 1)
 
     ppo = PPO(
         env=env,

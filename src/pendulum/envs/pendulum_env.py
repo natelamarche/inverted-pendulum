@@ -19,8 +19,10 @@ class PendulumEnv(gym.Env):
 
         # [phi, sin(theta), cos(theta), phi_dot, theta_dot]
         self.observation_space = gym.spaces.Box(
-            low=np.array([-np.inf, -1.0, -1.0, -np.inf, -np.inf], dtype=np.float32),
-            high=np.array([np.inf, 1.0, 1.0, np.inf, np.inf], dtype=np.float32),
+            low=np.array(
+                [-np.inf, -1.0, -1.0, -np.inf, -np.inf, -np.inf], dtype=np.float32
+            ),
+            high=np.array([np.inf, 1.0, 1.0, np.inf, np.inf, np.inf], dtype=np.float32),
             dtype=np.float32,
         )
 
@@ -49,7 +51,9 @@ class PendulumEnv(gym.Env):
         self.simulator.reset(initial_state)
 
         self.state_error_reward_matrix = np.diag([10.0, 20.0, 1.0, 0.1])
-        self.torque_error_reward = 1.0
+        self.torque_error_reward = 10.0
+        self.torque_change_reward = 5.0
+        self.previous_torque = 0.0
 
     def reset(
         self, seed: int | None = None, options: dict | None = None
@@ -65,11 +69,12 @@ class PendulumEnv(gym.Env):
 
         self.simulator.reset(initial_state)
 
-        observation = self._get_observation()
-
         self.steps = 0
         self.flag_captured = False
-        
+        self.previous_torque = 0.0
+
+        observation = self._get_observation()
+
         return observation, {}
 
     def step(
@@ -82,25 +87,31 @@ class PendulumEnv(gym.Env):
             self.simulator.step(torque)
 
         self.steps += 1
+
+        state = self.simulator.get_state()
+        assert np.all(np.isfinite(state))
         
-        observation = self._get_observation()
-
-        assert np.all(np.isfinite(observation))
-
-        theta_error = self.simulator.get_state()[1] - self.state_e[1]
+        theta_error = state[1] - self.state_e[1]
         theta_error = np.atan2(np.sin(theta_error), np.cos(theta_error))
-        
+
         if abs(theta_error) < np.pi / 16:
             self.flag_captured = True
 
         terminated = bool(
-            (abs(theta_error) > self.theta_cutoff_error and self.flag_captured) or
-            abs(observation[0]) > 1
+            (abs(theta_error) > self.theta_cutoff_error and self.flag_captured)
+            or abs(state[0]) > 2 * np.pi
         )
-        
+
         truncated = self.steps >= self.max_episode_steps
 
-        reward = self._get_reward(torque) - (1_000_000 if terminated else 0)
+        change_cost = self.torque_change_reward * (torque - self.previous_torque) ** 2
+
+        reward = (
+            self._get_reward(torque) - change_cost - (1_000_000 if terminated else 0)
+        )
+
+        self.previous_torque = float(torque)
+        observation = self._get_observation()
 
         return observation, reward, terminated, truncated, {}
 
@@ -114,6 +125,7 @@ class PendulumEnv(gym.Env):
                 np.cos(theta),
                 phi_dot / 10.0,
                 theta_dot / 15.0,
+                self.previous_torque / self.params.motor_torque_limit,
             ],
             dtype=np.float32,
         )
@@ -132,7 +144,7 @@ class PendulumEnv(gym.Env):
         return -(state_reward + torque_reward)
 
     def _sample_initial_state(self) -> np.ndarray:
-        
+
         if self.np_random.choice([True, False]):
             sample = (
                 self.np_random.random(size=(4,))
@@ -141,8 +153,7 @@ class PendulumEnv(gym.Env):
             ) * self.np_random.choice([-1, 1], size=4)
         else:
             sample = (
-                self.np_random.random(size=(4,))
-                * np.array([0.1, np.pi / 16, 0.1, 0.2])
+                self.np_random.random(size=(4,)) * np.array([0.1, np.pi / 16, 0.1, 0.2])
             ) * self.np_random.choice([-1, 1], size=4)
-        
+
         return self.state_e + sample
