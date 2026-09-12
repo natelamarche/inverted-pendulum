@@ -118,7 +118,7 @@ class PPO:
     def train_iteration(self):
         self.simulate()
 
-        for epoch in range(self.epochs):
+        for _epoch in range(self.epochs):
             for (
                 observations,
                 raw_actions,
@@ -148,7 +148,9 @@ class PPO:
                     self.policy.log_std,
                 ]
                 torch.nn.utils.clip_grad_norm_(actor_parameters, max_norm=0.5)
-                torch.nn.utils.clip_grad_norm_(self.policy.critic.parameters(), max_norm=0.5)
+                torch.nn.utils.clip_grad_norm_(
+                    self.policy.critic.parameters(), max_norm=0.5
+                )
 
                 self.optimizer.step()
 

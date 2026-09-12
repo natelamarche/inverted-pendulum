@@ -31,9 +31,9 @@ def make_env() -> PendulumEnv:
         params=params,
         dt=0.01,
         max_episode_steps=1000,
-        theta_cutoff_error= np.pi,
-        sample_range_lower= np.array([0.0, 0.0, 0.0, 0.0]),
-        sample_range_upper= np.array([0.1, np.pi / 2, 0.1, 0.2]),
+        theta_cutoff_error=np.pi,
+        sample_range_lower=np.array([0.0, 0.0, 0.0, 0.0]),
+        sample_range_upper=np.array([0.1, np.pi / 2, 0.1, 0.2]),
     )
 
     check_env(env)
@@ -43,22 +43,18 @@ def make_env() -> PendulumEnv:
 
 def main():
     parser = argparse.ArgumentParser(description="RL Controller trainer")
-    parser.add_argument(
-        "--checkpoint", type=Path, default=None
-    )
+    parser.add_argument("--checkpoint", type=Path, default=None)
     args = parser.parse_args()
     if args.checkpoint is not None and not args.checkpoint.is_file():
-        parser.error(
-            f"Checkpoint not found: {args.checkpoint}."
-        )
-    
+        parser.error(f"Checkpoint not found: {args.checkpoint}.")
+
     env = make_env()
     eval_env = make_env()
     output_dir = Path("models")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    policy = ActorCritic(5, 1)    
-    
+    policy = ActorCritic(5, 1)
+
     ppo = PPO(
         env=env,
         policy=policy,

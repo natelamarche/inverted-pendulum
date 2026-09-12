@@ -78,37 +78,39 @@ class PendulumEnv(gym.Env):
 
         for _ in range(self.controller_stride):
             self.simulator.step(torque)
-            
+
         self.steps += 1
 
         observation = self._get_observation()
 
         assert np.all(np.isfinite(observation))
-        
+
         theta_error = self.simulator.get_state()[1] - self.state_e[1]
         wrapped_theta_error = np.atan2(np.sin(theta_error), np.cos(theta_error))
 
         terminated = bool(
-            abs(wrapped_theta_error) > self.theta_cutoff_error or
-            abs(observation[0]) > 1
+            abs(wrapped_theta_error) > self.theta_cutoff_error
+            or abs(observation[0]) > 1
         )
 
         truncated = self.steps >= self.max_episode_steps
 
         reward = self._get_reward(torque) - (1_000_000 if terminated else 0)
-        
+
         return observation, reward, terminated, truncated, {}
 
     def _get_observation(self) -> np.ndarray:
         phi, theta, phi_dot, theta_dot = self.simulator.get_state()
 
-        return np.array([
-            phi / (2 * np.pi), 
-            np.sin(theta), 
-            np.cos(theta), 
-            phi_dot / 10.0, 
-            theta_dot / 15.0, 
-            ], dtype=np.float32
+        return np.array(
+            [
+                phi / (2 * np.pi),
+                np.sin(theta),
+                np.cos(theta),
+                phi_dot / 10.0,
+                theta_dot / 15.0,
+            ],
+            dtype=np.float32,
         )
 
     def _get_reward(self, torque: float) -> float:

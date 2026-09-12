@@ -151,9 +151,7 @@ class PendulumViewer:
     def _record(self, torque):
         theta = self.env.simulator.get_state()[1]
         error = np.arctan2(np.sin(theta - np.pi), np.cos(theta - np.pi))
-        self.history.append(
-            (self.env.steps * self.env.dt, np.rad2deg(error), torque)
-        )
+        self.history.append((self.env.steps * self.env.dt, np.rad2deg(error), torque))
 
     def advance(self):
         """Advance one physics/control step, stopping at the episode boundary."""

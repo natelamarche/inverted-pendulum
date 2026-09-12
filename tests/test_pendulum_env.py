@@ -108,9 +108,11 @@ def test_action_is_scaled_and_held_for_one_control_step(env: PendulumEnv) -> Non
     with patch.object(env.simulator, "step") as simulator_step:
         env.step(action)
 
-    assert simulator_step.call_args_list == [
-        call(pytest.approx(0.4 * env.params.motor_torque_limit))
-    ] * env.controller_stride
+    assert (
+        simulator_step.call_args_list
+        == [call(pytest.approx(0.4 * env.params.motor_torque_limit))]
+        * env.controller_stride
+    )
     assert simulator_step.call_count * env.simulator.dt == pytest.approx(env.dt)
     assert env.steps == 1
 
