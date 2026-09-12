@@ -42,11 +42,13 @@ class PendulumEnv(gym.Env):
         self.sample_range_upper = sample_range_upper
         initial_state: np.ndarray = self._sample_initial_state()
 
-        self.simulator = Simulator(self.params, dt)
+        self.controller_stride = 10
+        self.dt = dt
+        self.simulator = Simulator(self.params, self.dt / self.controller_stride)
         self.simulator.reset(initial_state)
 
-        self.state_error_reward_matrix = np.diag([1.0, 20.0, 0.1, 0.1])
-        self.torque_error_reward = 4.0
+        self.state_error_reward_matrix = np.diag([10.0, 20.0, 1.0, 0.1])
+        self.torque_error_reward = 1.0
 
     def reset(
         self, seed: int | None = None, options: dict | None = None
@@ -74,27 +76,39 @@ class PendulumEnv(gym.Env):
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
         torque = action[0] * self.params.motor_torque_limit
 
-        self.simulator.step(torque)
+        for _ in range(self.controller_stride):
+            self.simulator.step(torque)
+            
         self.steps += 1
 
         observation = self._get_observation()
 
-        reward = self._get_reward(torque)
-
+        assert np.all(np.isfinite(observation))
+        
         theta_error = self.simulator.get_state()[1] - self.state_e[1]
         wrapped_theta_error = np.atan2(np.sin(theta_error), np.cos(theta_error))
 
-        terminated = bool(abs(wrapped_theta_error) > self.theta_cutoff_error)
+        terminated = bool(
+            abs(wrapped_theta_error) > self.theta_cutoff_error or
+            abs(observation[0]) > 1
+        )
 
         truncated = self.steps >= self.max_episode_steps
 
+        reward = self._get_reward(torque) - (1_000_000 if terminated else 0)
+        
         return observation, reward, terminated, truncated, {}
 
     def _get_observation(self) -> np.ndarray:
         phi, theta, phi_dot, theta_dot = self.simulator.get_state()
 
-        return np.array(
-            [phi, np.sin(theta), np.cos(theta), phi_dot, theta_dot], dtype=np.float32
+        return np.array([
+            phi / (2 * np.pi), 
+            np.sin(theta), 
+            np.cos(theta), 
+            phi_dot / 10.0, 
+            theta_dot / 15.0, 
+            ], dtype=np.float32
         )
 
     def _get_reward(self, torque: float) -> float:

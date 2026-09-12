@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import numpy as np
 import pytest
@@ -89,22 +89,30 @@ def test_observation_represents_simulator_state(env: PendulumEnv) -> None:
     observation = env._get_observation()
 
     expected = np.array(
-        [state[0], np.sin(state[1]), np.cos(state[1]), state[2], state[3]],
+        [
+            state[0] / (2 * np.pi),
+            np.sin(state[1]),
+            np.cos(state[1]),
+            state[2] / 10.0,
+            state[3] / 15.0,
+        ],
         dtype=np.float32,
     )
     np.testing.assert_allclose(observation, expected)
     assert env.observation_space.contains(observation)
 
 
-def test_action_is_scaled_to_motor_torque_limit(env: PendulumEnv) -> None:
+def test_action_is_scaled_and_held_for_one_control_step(env: PendulumEnv) -> None:
     action = np.array([0.4], dtype=np.float32)
 
     with patch.object(env.simulator, "step") as simulator_step:
         env.step(action)
 
-    simulator_step.assert_called_once_with(
-        pytest.approx(0.4 * env.params.motor_torque_limit)
-    )
+    assert simulator_step.call_args_list == [
+        call(pytest.approx(0.4 * env.params.motor_torque_limit))
+    ] * env.controller_stride
+    assert simulator_step.call_count * env.simulator.dt == pytest.approx(env.dt)
+    assert env.steps == 1
 
 
 def test_episode_truncates_at_exact_step_limit(env: PendulumEnv) -> None:
@@ -173,6 +181,6 @@ def test_reward_applies_state_and_torque_costs(env: PendulumEnv) -> None:
 
     reward = env._get_reward(torque)
 
-    expected_cost = 1.0 + 20.0 * 0.2**2 + 0.1 * 2.0**2 + 0.1 * 3.0**2
-    expected_cost += 4.0 * torque**2
+    expected_cost = 10.0 + 20.0 * 0.2**2 + 1.0 * 2.0**2 + 0.1 * 3.0**2
+    expected_cost += torque**2
     assert reward == pytest.approx(-expected_cost)
