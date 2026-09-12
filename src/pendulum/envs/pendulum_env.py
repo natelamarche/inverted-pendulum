@@ -90,7 +90,7 @@ class PendulumEnv(gym.Env):
 
         state = self.simulator.get_state()
         assert np.all(np.isfinite(state))
-        
+
         theta_error = state[1] - self.state_e[1]
         theta_error = np.atan2(np.sin(theta_error), np.cos(theta_error))
 
