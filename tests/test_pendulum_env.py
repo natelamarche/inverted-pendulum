@@ -14,6 +14,7 @@ def env(pendulum_params: PendulumParameters) -> PendulumEnv:
         params=pendulum_params,
         dt=0.01,
         max_episode_steps=3,
+        sample_distribution_factor=np.zeros(4),
     )
 
 
@@ -107,6 +108,7 @@ def test_episode_termination_uses_theta_cutoff(
         params=pendulum_params,
         dt=0.01,
         max_episode_steps=3,
+        sample_distribution_factor=np.zeros(4),
         theta_cutoff_error=1.0,
     )
     env.simulator.reset(env.state_e + np.array([0.0, theta_error, 0.0, 0.0]))
