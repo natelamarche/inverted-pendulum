@@ -10,7 +10,7 @@ from pendulum.rl.policy import ActorCritic
 def evaluate_policy(
     policy: ActorCritic,
     env: PendulumEnv,
-    seeds: Sequence[int] = tuple(range(10_000, 10_010)),
+    seeds: Sequence[int] = tuple(range(10_000, 10_020)),
 ) -> dict[str, float]:
     if len(seeds) == 0:
         raise ValueError("Evaluation requires at least one seed")
@@ -40,7 +40,7 @@ def evaluate_policy(
 
                     theta_error = env.simulator.get_state()[1] - env.state_e[1]
                     theta_error = np.arctan2(np.sin(theta_error), np.cos(theta_error))
-                    torque = float(action[0]) * env.params.motor_torque_limit
+                    torque = env.previous_torque
                     angle_squared_sum += float(theta_error**2)
                     torque_squared_sum += torque**2
 

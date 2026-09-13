@@ -172,7 +172,7 @@ class PendulumViewer:
             if truncated
             else "Running"
         )
-        self._record(action * self.env.params.motor_torque_limit)
+        self._record(self.env.previous_torque)
 
     def _toggle_pause(self, event=None):
         self.paused = not self.paused
