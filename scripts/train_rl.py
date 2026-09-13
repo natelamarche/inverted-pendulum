@@ -72,7 +72,7 @@ def main():
     if args.checkpoint is not None:
         ppo.load(args.checkpoint)
 
-    total_timesteps = 1_000_000
+    total_timesteps = 4_000_000
     timesteps = 0
     iterations = 0
     eval_every_iterations = 4
@@ -93,11 +93,8 @@ def main():
             f"torque RMS={metrics['torque_rms_nm']:.4f} Nm"
         )
 
-        score = (
-            metrics["survival_rate"],
-            metrics["mean_episode_steps"],
-            metrics["mean_return"],
-        )
+        score = metrics["mean_return"]
+
         if best_score is None or score > best_score:
             best_score = score
             ppo.save(output_dir / "rl_controller_best.pth")

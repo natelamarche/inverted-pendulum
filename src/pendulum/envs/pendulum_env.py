@@ -45,15 +45,17 @@ class PendulumEnv(gym.Env):
         self.sample_range_upper = sample_range_upper
         initial_state: np.ndarray = self._sample_initial_state()
 
-        self.controller_stride = 1
+        self.controller_stride = 10
         self.dt = dt
         self.simulator = Simulator(self.params, self.dt / self.controller_stride)
         self.simulator.reset(initial_state)
 
         self.state_error_reward_matrix = np.diag([10.0, 20.0, 1.0, 0.1])
         self.torque_error_reward = 10.0
-        self.torque_change_reward = 5.0
+        self.torque_change_reward_flagged = 20.0
+        self.torque_change_reward = 20.0
         self.previous_torque = 0.0
+        self.torque_rate_limit = 2.0
 
     def reset(
         self, seed: int | None = None, options: dict | None = None
@@ -81,7 +83,15 @@ class PendulumEnv(gym.Env):
         self,
         action: np.ndarray,
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
-        torque = action[0] * self.params.motor_torque_limit
+        requested_torque = float(action[0]) * self.params.motor_torque_limit
+        max_change = self.torque_rate_limit * self.dt
+        torque = float(
+            np.clip(
+                requested_torque,
+                self.previous_torque - max_change,
+                self.previous_torque + max_change,
+            )
+        )
 
         for _ in range(self.controller_stride):
             self.simulator.step(torque)
@@ -94,7 +104,7 @@ class PendulumEnv(gym.Env):
         theta_error = state[1] - self.state_e[1]
         theta_error = np.atan2(np.sin(theta_error), np.cos(theta_error))
 
-        if abs(theta_error) < np.pi / 16:
+        if abs(theta_error) < np.pi / 32:
             self.flag_captured = True
 
         terminated = bool(
@@ -104,7 +114,11 @@ class PendulumEnv(gym.Env):
 
         truncated = self.steps >= self.max_episode_steps
 
-        change_cost = self.torque_change_reward * (torque - self.previous_torque) ** 2
+        change_cost = (
+            self.torque_change_reward_flagged
+            if self.flag_captured
+            else self.torque_change_reward
+        ) * (torque - self.previous_torque) ** 2
 
         reward = (
             self._get_reward(torque) - change_cost - (1_000_000 if terminated else 0)
