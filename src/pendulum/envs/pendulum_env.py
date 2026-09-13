@@ -55,7 +55,6 @@ class PendulumEnv(gym.Env):
         self.torque_change_reward_flagged = 20.0
         self.torque_change_reward = 20.0
         self.previous_torque = 0.0
-        self.torque_rate_limit = 2.0
 
     def reset(
         self, seed: int | None = None, options: dict | None = None
@@ -84,12 +83,11 @@ class PendulumEnv(gym.Env):
         action: np.ndarray,
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
         requested_torque = float(action[0]) * self.params.motor_torque_limit
-        max_change = self.torque_rate_limit * self.dt
         torque = float(
             np.clip(
                 requested_torque,
-                self.previous_torque - max_change,
-                self.previous_torque + max_change,
+                -self.params.motor_torque_limit,
+                self.params.motor_torque_limit,
             )
         )
 
