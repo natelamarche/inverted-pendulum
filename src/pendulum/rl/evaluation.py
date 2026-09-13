@@ -33,7 +33,7 @@ def evaluate_policy(
                     obs = torch.as_tensor(
                         observation, dtype=parameter.dtype, device=parameter.device
                     )
-                    action = torch.tanh(policy.actor(obs)).cpu().numpy()
+                    action = torch.tanh(policy.get_action_mean(obs)).cpu().numpy()
                     observation, reward, terminated, truncated, _ = env.step(action)
                     episode_return += reward
                     length += 1

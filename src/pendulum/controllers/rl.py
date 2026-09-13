@@ -26,4 +26,4 @@ class RLController(Controller):
             obs = torch.as_tensor(
                 observation, dtype=parameter.dtype, device=parameter.device
             )
-            return float(torch.tanh(self.policy.actor(obs)).item())
+            return float(torch.tanh(self.policy.get_action_mean(obs)).item())

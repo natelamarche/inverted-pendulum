@@ -8,8 +8,9 @@ from torch.distributions import Normal
 class ActorCritic(nn.Module):
     def __init__(self, observation_dim: int, action_dim: int, initial_std: float = 0.5):
         super().__init__()
+        # The final observation is previous torque, available only to the critic.
         self.actor = nn.Sequential(
-            nn.Linear(observation_dim, 64),
+            nn.Linear(observation_dim - 1, 64),
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh(),
@@ -28,8 +29,11 @@ class ActorCritic(nn.Module):
             nn.Linear(64, 1),
         )
 
+    def get_action_mean(self, obs: torch.Tensor) -> torch.Tensor:
+        return self.actor(obs[..., :-1])
+
     def get_action_distribution(self, obs: torch.Tensor) -> Normal:
-        mu = self.actor(obs)
+        mu = self.get_action_mean(obs)
         std = torch.exp(self.log_std)
 
         return Normal(mu, std)
