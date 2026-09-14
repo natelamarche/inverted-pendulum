@@ -21,7 +21,7 @@ def make_teacher(env: PendulumEnv) -> LQRController:
 
 
 def make_dataset(env, teacher, count, rng, bounds):
-    percent_upright = 0.7
+    percent_upright = 0.5
     count_upright = round(count * percent_upright)
 
     errors = rng.uniform(-1.0, 1.0, (count_upright, 4)) * bounds
@@ -43,7 +43,7 @@ def make_dataset(env, teacher, count, rng, bounds):
     count_relaxed = count - count_upright
 
     relaxed_errors = rng.uniform(-1.0, 1.0, (count_relaxed, 4)) * np.array(
-        [np.pi / 4, np.pi / 4, 1.0, 1.0]
+        [2 * np.pi, np.pi / 2, 10.0, 10.0]
     )
 
     relaxed_state_e = env.state_e + np.array([0, np.pi, 0, 0])
@@ -156,7 +156,7 @@ def save_checkpoint(policy, output, ppo_learning_rate, metadata):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--output", type=Path, default=Path("models/lqr_pretrained.pth")
+        "--output", type=Path, default=Path("models/lqr_zeros_pretrained.pth")
     )
     parser.add_argument("--samples", type=int, default=32768)
     parser.add_argument("--validation-samples", type=int, default=4096)
