@@ -23,7 +23,7 @@ def make_teacher(env: PendulumEnv) -> LQRController:
 def make_dataset(env, teacher, count, rng, bounds):
     percent_upright = 0.7
     count_upright = round(count * percent_upright)
-    
+
     errors = rng.uniform(-1.0, 1.0, (count_upright, 4)) * bounds
     errors *= rng.choice([0.05, 0.2, 1.0], size=(count_upright, 1))
     states = env.state_e + errors
@@ -39,21 +39,25 @@ def make_dataset(env, teacher, count, rng, bounds):
                 1.0,
             )
         )
-    
+
     count_relaxed = count - count_upright
-    
-    relaxed_errors = rng.uniform(-1.0, 1.0, (count_relaxed, 4)) * np.array([np.pi/4, np.pi/4, 1.0, 1.0])
-    
+
+    relaxed_errors = rng.uniform(-1.0, 1.0, (count_relaxed, 4)) * np.array(
+        [np.pi / 4, np.pi / 4, 1.0, 1.0]
+    )
+
     relaxed_state_e = env.state_e + np.array([0, np.pi, 0, 0])
-    relaxed_state_e[1] = np.arctan2(np.sin(relaxed_state_e[1]), np.cos(relaxed_state_e[1]))
-    
+    relaxed_state_e[1] = np.arctan2(
+        np.sin(relaxed_state_e[1]), np.cos(relaxed_state_e[1])
+    )
+
     relaxed_states = relaxed_state_e + relaxed_errors
-    
+
     for state in relaxed_states:
         observation, _ = env.reset(options={"initial_state": state})
         observations.append(observation)
         targets.append(0.0)
-    
+
     return (
         torch.from_numpy(np.asarray(observations, dtype=np.float32)),
         torch.from_numpy(np.asarray(targets, dtype=np.float32)).unsqueeze(-1),

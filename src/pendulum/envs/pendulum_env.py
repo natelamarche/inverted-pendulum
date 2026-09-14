@@ -150,13 +150,11 @@ class PendulumEnv(gym.Env):
 
         theta_error = state_error[1]
         theta_dot = state[3]
-        
-        near_upright = np.exp(
-            -(theta_error / np.deg2rad(30.0)) ** 2
-        )
-        
+
+        near_upright = np.exp(-((theta_error / np.deg2rad(30.0)) ** 2))
+
         arrival_cost = 0.5 * near_upright * theta_dot**2
-        
+
         state_reward = state_error @ self.state_error_reward_matrix @ state_error
 
         torque_error = torque - self.torque_e
@@ -166,7 +164,7 @@ class PendulumEnv(gym.Env):
 
     def _sample_initial_state(self) -> np.ndarray:
 
-        if self.np_random.choice([True, False], p=[0.7,0.3]):
+        if self.np_random.choice([True, False], p=[0.7, 0.3]):
             sample = (
                 self.np_random.random(size=(4,))
                 * (self.sample_range_upper - self.sample_range_lower)
