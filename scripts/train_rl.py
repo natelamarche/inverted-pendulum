@@ -91,7 +91,7 @@ def main():
             f"survival={metrics['survival_rate']:.0%}, "
             f"angle RMSE={metrics['angle_rmse_rad']:.4f} rad, "
             f"torque RMS={metrics['torque_rms_nm']:.4f} Nm, "
-            f"action std={metrics['action_std']:.4f}, "
+            f"pre-tanh action std={metrics['action_std']:.6g}, "
             f"upright survival={metrics['upright_survival_rate']:.0%}"
         )
 

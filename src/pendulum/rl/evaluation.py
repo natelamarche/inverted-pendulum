@@ -67,6 +67,7 @@ def evaluate_policy(
         "survival_rate": survivors / len(seeds),
         "angle_rmse_rad": float(np.sqrt(angle_squared_sum / steps)),
         "torque_rms_nm": float(np.sqrt(torque_squared_sum / steps)),
-        "action_std": float(torch.exp(policy.log_std)),
-        "upright_survival_rate": float(up_survivors / up_total),
+        # Standard deviation of the Gaussian before tanh, not torque in Nm.
+        "action_std": policy.log_std.detach().exp().item(),
+        "upright_survival_rate": up_survivors / up_total if up_total else float("nan"),
     }
