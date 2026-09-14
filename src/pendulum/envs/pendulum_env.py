@@ -45,7 +45,7 @@ class PendulumEnv(gym.Env):
         self.sample_range_upper = sample_range_upper
         initial_state: np.ndarray = self._sample_initial_state()
 
-        self.controller_stride = 10
+        self.controller_stride = 1
         self.dt = dt
         self.simulator = Simulator(self.params, self.dt / self.controller_stride)
         self.simulator.reset(initial_state)
@@ -148,16 +148,25 @@ class PendulumEnv(gym.Env):
         state_error = state - self.state_e
         state_error[1] = np.arctan2(np.sin(state_error[1]), np.cos(state_error[1]))
 
+        theta_error = state_error[1]
+        theta_dot = state[3]
+        
+        near_upright = np.exp(
+            -(theta_error / np.deg2rad(30.0)) ** 2
+        )
+        
+        arrival_cost = 0.5 * near_upright * theta_dot**2
+        
         state_reward = state_error @ self.state_error_reward_matrix @ state_error
 
         torque_error = torque - self.torque_e
         torque_reward = self.torque_error_reward * torque_error**2
 
-        return -(state_reward + torque_reward)
+        return -(state_reward + torque_reward + arrival_cost)
 
     def _sample_initial_state(self) -> np.ndarray:
 
-        if self.np_random.choice([True, False]):
+        if self.np_random.choice([True, False], p=[0.7,0.3]):
             sample = (
                 self.np_random.random(size=(4,))
                 * (self.sample_range_upper - self.sample_range_lower)
