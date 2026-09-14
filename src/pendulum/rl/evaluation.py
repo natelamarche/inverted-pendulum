@@ -60,4 +60,5 @@ def evaluate_policy(
         "survival_rate": survivors / len(seeds),
         "angle_rmse_rad": float(np.sqrt(angle_squared_sum / steps)),
         "torque_rms_nm": float(np.sqrt(torque_squared_sum / steps)),
+        "action_std": float(torch.exp(policy.log_std)),
     }

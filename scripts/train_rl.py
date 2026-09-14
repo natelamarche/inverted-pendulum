@@ -32,8 +32,8 @@ def make_env() -> PendulumEnv:
         dt=0.01,
         max_episode_steps=1000,
         theta_cutoff_error=np.pi / 4,
-        sample_range_lower=np.array([0.0, np.pi / 2, 0.0, 0.0]),
-        sample_range_upper=np.array([0.1, np.pi, 0.1, 0.2]),
+        sample_range_lower=np.array([0.0, 15 * np.pi / 16, 0.0, 0.0]),
+        sample_range_upper=np.array([0.0, np.pi, 0.0, 0.0]),
     )
 
     check_env(env)
@@ -72,7 +72,7 @@ def main():
     if args.checkpoint is not None:
         ppo.load(args.checkpoint)
 
-    total_timesteps = 4_000_000
+    total_timesteps = 2_000_000
     timesteps = 0
     iterations = 0
     eval_every_iterations = 4
@@ -90,7 +90,8 @@ def main():
             f"({metrics['mean_episode_seconds']:.2f}s), "
             f"survival={metrics['survival_rate']:.0%}, "
             f"angle RMSE={metrics['angle_rmse_rad']:.4f} rad, "
-            f"torque RMS={metrics['torque_rms_nm']:.4f} Nm"
+            f"torque RMS={metrics['torque_rms_nm']:.4f} Nm, "
+            f"action std={metrics['action_std']:.4f}"
         )
 
         score = metrics["mean_return"]
@@ -111,6 +112,7 @@ def main():
                     "survival_rate",
                     "angle_rmse_rad",
                     "torque_rms_nm",
+                    "action_std",
                 ],
             )
             writer.writeheader()
