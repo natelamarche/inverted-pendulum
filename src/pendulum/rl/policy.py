@@ -10,11 +10,11 @@ class ActorCritic(nn.Module):
         super().__init__()
         # The final observation is previous torque, available only to the critic.
         self.actor = nn.Sequential(
-            nn.Linear(observation_dim - 1, 64),
+            nn.Linear(observation_dim - 1, 128),
             nn.Tanh(),
-            nn.Linear(64, 64),
+            nn.Linear(128, 128),
             nn.Tanh(),
-            nn.Linear(64, action_dim),
+            nn.Linear(128, action_dim),
         )
 
         self.log_std = nn.Parameter(
