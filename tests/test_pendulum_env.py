@@ -37,11 +37,13 @@ def test_reset_is_seeded_and_resets_simulator(env: PendulumEnv) -> None:
         np.testing.assert_array_equal(second_observation, first_observation)
         np.testing.assert_array_equal(env.simulator.get_state(), first_state)
         assert env.steps == 0
-        assert first_info == second_info == {}
+        assert first_info == second_info
+        assert isinstance(first_info["upright"], (bool, np.bool_))
 
 
 def test_explicit_reset_starts_at_equilibrium(env: PendulumEnv) -> None:
-    observation, _ = env.reset(options={"initial_state": env.state_e.copy()})
+    observation, info = env.reset(options={"initial_state": env.state_e.copy()})
+    assert info == {"upright": None}
 
     np.testing.assert_allclose(env.simulator.get_state(), env.state_e)
     np.testing.assert_allclose(
@@ -180,10 +182,13 @@ def test_reward_applies_state_and_torque_costs(env: PendulumEnv) -> None:
 
     expected_cost = 10.0 + 20.0 * 0.2**2 + 1.0 * 2.0**2 + 0.1 * 3.0**2
     expected_cost += 10.0 * torque**2
+    expected_cost += 0.5 * np.exp(-((0.2 / np.deg2rad(30.0)) ** 2)) * 3.0**2
     assert reward == pytest.approx(-expected_cost)
 
 
 def test_torque_costs_observation_history_and_reset(env: PendulumEnv):
+    # Use a known weight so this behavioral test is independent of reward tuning.
+    env.torque_change_reward_flagged = 5.0
     env.max_episode_steps = 10
     env.reset(options={"initial_state": env.state_e.copy()})
     limit = env.params.motor_torque_limit

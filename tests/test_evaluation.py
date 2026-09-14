@@ -18,7 +18,7 @@ def test_evaluation_metrics_and_terminal_step(pendulum_params, terminated):
         sample_range_lower=np.zeros(4),
         sample_range_upper=np.zeros(4),
     )
-    policy = ActorCritic(6, 1)
+    policy = ActorCritic(6, 1, initial_std=0.00063)
     with torch.no_grad():
         for parameter in policy.actor.parameters():
             parameter.zero_()
@@ -27,6 +27,8 @@ def test_evaluation_metrics_and_terminal_step(pendulum_params, terminated):
     def step(action):
         np.testing.assert_allclose(action, [0.4], atol=1e-6)
         env.steps += 1
+        # The metric must report applied torque, even when it differs from requested.
+        env.previous_torque = 0.3 * pendulum_params.motor_torque_limit
         # Include a full revolution to check angle wrapping.
         env.simulator.state[1] = np.pi + 2 * np.pi + 0.2
         done = env.steps == 2
@@ -42,7 +44,9 @@ def test_evaluation_metrics_and_terminal_step(pendulum_params, terminated):
             "mean_episode_seconds": 0.02,
             "survival_rate": 0.0 if terminated else 1.0,
             "angle_rmse_rad": 0.2,
-            "torque_rms_nm": 0.4 * pendulum_params.motor_torque_limit,
+            "torque_rms_nm": 0.3 * pendulum_params.motor_torque_limit,
+            "action_std": 0.00063,
+            "upright_survival_rate": 0.0 if terminated else 1.0,
         }
     )
     assert policy.training
@@ -69,3 +73,30 @@ def test_evaluation_is_repeatable_without_consuming_torch_rng(pendulum_params):
 def test_evaluation_rejects_empty_seeds():
     with pytest.raises(ValueError, match="at least one seed"):
         evaluate_policy(ActorCritic(6, 1), None, seeds=[])
+
+
+@pytest.mark.parametrize("starts", [(False, False), (True, False), (True, True)])
+def test_upright_survival_uses_only_upright_starts(pendulum_params, starts):
+    env = PendulumEnv(pendulum_params, 0.01, 1, np.zeros(4), np.zeros(4))
+    reset = env.reset
+
+    def controlled_reset(seed):
+        observation, _ = reset(options={"initial_state": env.state_e.copy()})
+        return observation, {"upright": starts[seed]}
+
+    # First episode survives, second terminates at the time limit.
+    outcomes = [
+        (env._get_observation(), 0.0, False, True, {}),
+        (env._get_observation(), 0.0, True, True, {}),
+    ]
+    with (
+        patch.object(env, "reset", side_effect=controlled_reset),
+        patch.object(env, "step", side_effect=outcomes),
+    ):
+        metrics = evaluate_policy(ActorCritic(6, 1), env, seeds=[0, 1])
+
+    assert metrics["survival_rate"] == 0.5
+    if not any(starts):
+        assert np.isnan(metrics["upright_survival_rate"])
+    else:
+        assert metrics["upright_survival_rate"] == 1 / sum(starts)
