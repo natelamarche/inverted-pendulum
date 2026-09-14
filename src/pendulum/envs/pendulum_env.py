@@ -17,7 +17,7 @@ class PendulumEnv(gym.Env):
     ):
         self.params: PendulumParameters = params
 
-        # [phi, sin(theta), cos(theta), phi_dot, theta_dot]
+        # Normalized [phi, sin(theta), cos(theta), phi_dot, theta_dot, previous_torque]
         self.observation_space = gym.spaces.Box(
             low=np.array(
                 [-np.inf, -1.0, -1.0, -np.inf, -np.inf, -np.inf], dtype=np.float32
@@ -166,7 +166,7 @@ class PendulumEnv(gym.Env):
 
         return -(state_reward + torque_reward + arrival_cost)
 
-    def _sample_initial_state(self) -> np.ndarray:
+    def _sample_initial_state(self) -> tuple[np.ndarray, np.bool_]:
         upright = self.np_random.choice([True, False])
 
         if not upright:
