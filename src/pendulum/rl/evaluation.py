@@ -29,9 +29,9 @@ def evaluate_policy(
         with torch.no_grad():
             for seed in seeds:
                 observation, info = env.reset(seed=seed)
-                upright = info['upright']
+                upright = info["upright"]
                 up_total += 1 if upright else 0
-                
+
                 episode_return = 0.0
                 length = 0
                 while True:
@@ -68,5 +68,5 @@ def evaluate_policy(
         "angle_rmse_rad": float(np.sqrt(angle_squared_sum / steps)),
         "torque_rms_nm": float(np.sqrt(torque_squared_sum / steps)),
         "action_std": float(torch.exp(policy.log_std)),
-        "upright_survival_rate": float(up_survivors/up_total),
+        "upright_survival_rate": float(up_survivors / up_total),
     }

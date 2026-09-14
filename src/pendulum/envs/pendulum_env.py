@@ -62,7 +62,7 @@ class PendulumEnv(gym.Env):
         super().reset(seed=seed)
 
         up = None
-        
+
         if options is not None and "initial_state" in options:
             initial_state = np.asarray(options["initial_state"], dtype=float)
             if initial_state.shape != (4,) or not np.all(np.isfinite(initial_state)):
@@ -78,10 +78,8 @@ class PendulumEnv(gym.Env):
 
         observation = self._get_observation()
 
-        info = {
-            "upright": up
-        }
-        
+        info = {"upright": up}
+
         return observation, info
 
     def step(
@@ -170,7 +168,7 @@ class PendulumEnv(gym.Env):
 
     def _sample_initial_state(self) -> np.ndarray:
         upright = self.np_random.choice([True, False])
-        
+
         if not upright:
             sample = (
                 self.np_random.random(size=(4,))
