@@ -52,8 +52,8 @@ class PendulumEnv(gym.Env):
 
         self.state_error_reward_matrix = np.diag([10.0, 20.0, 1.0, 0.1])
         self.torque_error_reward = 10.0
-        self.torque_change_reward_flagged = 20.0
-        self.torque_change_reward = 20.0
+        self.torque_change_reward_flagged = 50000.0
+        self.torque_change_reward = 50000.0
         self.previous_torque = 0.0
 
     def reset(
