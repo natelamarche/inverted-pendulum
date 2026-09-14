@@ -43,7 +43,7 @@ class PendulumEnv(gym.Env):
         # [phi, theta, phi_dot, theta_dot]
         self.sample_range_lower = sample_range_lower
         self.sample_range_upper = sample_range_upper
-        initial_state: np.ndarray = self._sample_initial_state()
+        initial_state, _ = self._sample_initial_state()
 
         self.controller_stride = 1
         self.dt = dt
@@ -61,12 +61,14 @@ class PendulumEnv(gym.Env):
     ) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
 
+        up = None
+        
         if options is not None and "initial_state" in options:
             initial_state = np.asarray(options["initial_state"], dtype=float)
             if initial_state.shape != (4,) or not np.all(np.isfinite(initial_state)):
                 raise ValueError("initial_state must contain four finite values")
         else:
-            initial_state = self._sample_initial_state()
+            initial_state, up = self._sample_initial_state()
 
         self.simulator.reset(initial_state)
 
@@ -76,7 +78,11 @@ class PendulumEnv(gym.Env):
 
         observation = self._get_observation()
 
-        return observation, {}
+        info = {
+            "upright": up
+        }
+        
+        return observation, info
 
     def step(
         self,
@@ -163,8 +169,9 @@ class PendulumEnv(gym.Env):
         return -(state_reward + torque_reward + arrival_cost)
 
     def _sample_initial_state(self) -> np.ndarray:
-
-        if self.np_random.choice([True, False], p=[0.7, 0.3]):
+        upright = self.np_random.choice([True, False])
+        
+        if not upright:
             sample = (
                 self.np_random.random(size=(4,))
                 * (self.sample_range_upper - self.sample_range_lower)
@@ -175,4 +182,4 @@ class PendulumEnv(gym.Env):
                 self.np_random.random(size=(4,)) * np.array([0.1, np.pi / 16, 0.1, 0.2])
             ) * self.np_random.choice([-1, 1], size=4)
 
-        return self.state_e + sample
+        return (self.state_e + sample, upright)

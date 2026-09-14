@@ -91,7 +91,8 @@ def main():
             f"survival={metrics['survival_rate']:.0%}, "
             f"angle RMSE={metrics['angle_rmse_rad']:.4f} rad, "
             f"torque RMS={metrics['torque_rms_nm']:.4f} Nm, "
-            f"action std={metrics['action_std']:.4f}"
+            f"action std={metrics['action_std']:.4f}, "
+            f"upright survival={metrics['upright_survival_rate']:.0%}"
         )
 
         score = metrics["mean_return"]
@@ -113,6 +114,7 @@ def main():
                     "angle_rmse_rad",
                     "torque_rms_nm",
                     "action_std",
+                    "upright_survival_rate",
                 ],
             )
             writer.writeheader()
