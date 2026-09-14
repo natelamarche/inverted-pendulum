@@ -21,8 +21,11 @@ def make_teacher(env: PendulumEnv) -> LQRController:
 
 
 def make_dataset(env, teacher, count, rng, bounds):
-    errors = rng.uniform(-1.0, 1.0, (count, 4)) * bounds
-    errors *= rng.choice([0.05, 0.2, 1.0], size=(count, 1))
+    percent_upright = 0.7
+    count_upright = round(count * percent_upright)
+    
+    errors = rng.uniform(-1.0, 1.0, (count_upright, 4)) * bounds
+    errors *= rng.choice([0.05, 0.2, 1.0], size=(count_upright, 1))
     states = env.state_e + errors
     observations = []
     targets = []
@@ -36,6 +39,21 @@ def make_dataset(env, teacher, count, rng, bounds):
                 1.0,
             )
         )
+    
+    count_relaxed = count - count_upright
+    
+    relaxed_errors = rng.uniform(-1.0, 1.0, (count_relaxed, 4)) * np.array([np.pi/4, np.pi/4, 1.0, 1.0])
+    
+    relaxed_state_e = env.state_e + np.array([0, np.pi, 0, 0])
+    relaxed_state_e[1] = np.arctan2(np.sin(relaxed_state_e[1]), np.cos(relaxed_state_e[1]))
+    
+    relaxed_states = relaxed_state_e + relaxed_errors
+    
+    for state in relaxed_states:
+        observation, _ = env.reset(options={"initial_state": state})
+        observations.append(observation)
+        targets.append(0.0)
+    
     return (
         torch.from_numpy(np.asarray(observations, dtype=np.float32)),
         torch.from_numpy(np.asarray(targets, dtype=np.float32)).unsqueeze(-1),
@@ -175,8 +193,6 @@ def main():
         parser.error("--seed must be between 0 and 2**32 - 1")
     if args.tilt_deg >= 45:
         parser.error("--tilt-deg must be below 45 for this local balancing task")
-    if args.output.exists():
-        parser.error(f"Output already exists: {args.output}; choose a new --output")
 
     torch.manual_seed(args.seed)
     rng = np.random.default_rng(args.seed)
