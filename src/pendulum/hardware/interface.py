@@ -14,7 +14,7 @@ class HardwarePendulum:
         self, 
         port: str, 
         state_estimator: StateEstimator,
-        baudrate: int = 115200,
+        baudrate: int = 230400,
         control_period: float  = 0.002,
     ):
         self.serial = serial.Serial(
