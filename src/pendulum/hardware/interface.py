@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import logging
 from threading import Lock
 from types import TracebackType
 import numpy as np
@@ -8,6 +9,9 @@ import serial
 
 from pendulum.dynamics.actuation import ACCELERATION_LIMIT
 from .state_estimator import StateEstimator
+from .diagnostics import FirmwareDiagnostic, FirmwareStoppedError
+
+logger = logging.getLogger(__name__)
 
 PENDULUM_COUNTS_PER_DEGREE = 6.666667
 ROTOR_MICROSTEPS_PER_DEGREE = 8.888889
@@ -39,6 +43,8 @@ class HardwarePendulum:
         self._sequence = 0
         self._running = False
         self._zeroed = False
+        self.last_diagnostic: FirmwareDiagnostic | None = None
+        self.last_stop_diagnostic: FirmwareDiagnostic | None = None
         
         self.serial.reset_input_buffer()
 
@@ -112,6 +118,8 @@ class HardwarePendulum:
             read_once = True
 
     def _parse_record(self, line: bytes) -> np.ndarray | None:
+        if self._handle_diagnostic(line):
+            return None
         try:
             fields = line.decode("ascii").split()
         except UnicodeDecodeError:
@@ -142,12 +150,41 @@ class HardwarePendulum:
             timestamp=self._measurement_time,
         )
     
+    def _handle_diagnostic(self, line: bytes) -> bool:
+        if not line.startswith((b"EVENT,STOP,", b"STATUS,")):
+            return False
+        try:
+            diagnostic = FirmwareDiagnostic.parse(line.decode("ascii"))
+        except (UnicodeDecodeError, ValueError) as error:
+            logger.warning("Invalid firmware diagnostic %r: %s", line, error)
+            return True
+        self.last_diagnostic = diagnostic
+        logger.log(
+            logging.WARNING if diagnostic.stopped else logging.INFO,
+            "Firmware: %s", diagnostic.raw,
+        )
+        if diagnostic.stopped:
+            self.last_stop_diagnostic = diagnostic
+            was_running = self._running
+            self._invalidate_session()
+            if was_running:
+                raise FirmwareStoppedError(diagnostic)
+        return True
+
     def zero(self, timeout: float = 0.1) -> None:
         if self._running:
             raise RuntimeError("Cannot zero pendulum while motor is running")
 
         if not np.isfinite(timeout) or timeout <= 0.0:
             raise ValueError("Timeout must be finite and positive")
+
+        # Record queued faults before ZERO clears the firmware's stop latch.
+        drain_deadline = time.monotonic() + timeout
+        while time.monotonic() < drain_deadline:
+            line = self._read_line()
+            if line is None:
+                break
+            self._handle_diagnostic(line)
 
         self._zeroed = False
         try:
@@ -165,6 +202,8 @@ class HardwarePendulum:
                 line = self._read_line()
                 if line is None:
                     break
+                if self._handle_diagnostic(line):
+                    continue
                 if line == b"ACK,ZERO":
                     self._measurement_time = 0.0
                     self.state_estimator.reset()

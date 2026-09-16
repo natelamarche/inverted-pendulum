@@ -1,4 +1,5 @@
 import argparse
+import logging
 import time
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from train_rl import make_env
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Run RL hardware control at 100 Hz")
     parser.add_argument("--port", required=True)
     parser.add_argument(
