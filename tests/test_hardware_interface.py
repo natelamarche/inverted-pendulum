@@ -1,7 +1,9 @@
 from unittest.mock import Mock
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
+import serial
 
 from pendulum.hardware.interface import MAX_LINE_BYTES, HardwarePendulum
 from pendulum.hardware.state_estimator import StateEstimator
@@ -52,8 +54,66 @@ def test_close_stops_after_start_was_sent_but_write_failed(hardware):
     with pytest.raises(OSError, match="drain failed"), hardware:
         hardware.start(10)
 
-    assert hardware.serial.commands == [b"START,1,10.000000\r", b"STOP\r"]
+    assert hardware.serial.commands == [b"START,1", b"STOP\r"]
     assert not hardware.serial.is_open
+
+
+@pytest.mark.parametrize("command", ["ZERO", "STOP", "START,1,-10.000000", "A,27,-10.000000"])
+def test_command_chunks_are_paced(hardware, monkeypatch, command):
+    events = []
+    hardware.serial.on_write.side_effect = lambda: events.append(
+        ("write", hardware.serial.commands[-1])
+    )
+    monkeypatch.setattr(
+        "pendulum.hardware.interface.time.sleep",
+        lambda delay: events.append(("sleep", delay)),
+    )
+
+    hardware._write_command(command)
+
+    payload = f"{command}\r".encode("ascii")
+    assert b"".join(hardware.serial.commands) == payload
+    assert all(1 <= len(chunk) <= 7 for chunk in hardware.serial.commands)
+    assert events == [
+        event
+        for chunk in hardware.serial.commands
+        for event in [("write", chunk), ("sleep", 0.001)]
+    ]
+
+
+def test_concurrent_commands_do_not_interleave(hardware):
+    commands = [f"A,{sequence},-10.000000" for sequence in range(20)]
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(executor.map(hardware._write_command, commands))
+
+    received = b"".join(hardware.serial.commands).decode("ascii").split("\r")
+    assert received[-1] == ""
+    assert sorted(received[:-1]) == sorted(commands)
+
+
+@pytest.mark.parametrize("original", [RuntimeError("control failed"), KeyboardInterrupt()])
+def test_cleanup_failure_preserves_original_exception(hardware, original):
+    hardware.serial.on_write.side_effect = serial.SerialTimeoutException("Write timeout")
+
+    with pytest.raises(type(original)) as raised, hardware:
+        raise original
+
+    assert raised.value is original
+    assert "cleanup also failed" in original.__notes__[0]
+    assert hardware.serial.commands == [b"STOP\r"]
+    assert not hardware.serial.is_open
+
+
+def test_short_write_mid_command_stops_sending_and_invalidates_session(hardware):
+    hardware._running = hardware._zeroed = True
+    hardware.serial.write = Mock(side_effect=[7, 1])
+
+    with pytest.raises(OSError, match="Incomplete serial command"):
+        hardware.apply_acceleration(-10)
+
+    assert hardware.serial.write.call_count == 2
+    assert not hardware._running
+    assert not hardware._zeroed
 
 
 def test_close_stops_even_without_start_and_is_idempotent(hardware):
