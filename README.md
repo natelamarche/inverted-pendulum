@@ -4,7 +4,7 @@ A Python project for simulating and controlling a rotary inverted pendulum. It c
 
 ## Demo
 
-[▶ Watch the hardware demo](https://www.youtube.com/watch?v=Agkeckp2kVY)
+[![▶ Watch the hardware demo](https://img.youtube.com/vi/Agkeckp2kVY/maxresdefault.jpg)](https://www.youtube.com/watch?v=Agkeckp2kVY)
 
 ## Highlights
 
