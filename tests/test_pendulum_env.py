@@ -96,18 +96,32 @@ def test_observation_represents_simulator_state(env: PendulumEnv) -> None:
     assert env.observation_space.contains(observation)
 
 
-def test_action_is_scaled_and_held_for_one_control_step(env: PendulumEnv) -> None:
-    action = np.array([0.4], dtype=np.float32)
+@pytest.mark.parametrize("action_value", [-1.0, 0.001, 1.0])
+def test_action_is_scaled_and_held_for_one_control_step(env, action_value):
+    from pendulum.dynamics.model import accelerations
 
-    with patch.object(env.simulator, "step") as simulator_step:
-        env.step(action)
+    env.params.motor_torque_limit = 2.0
+    env.reset(options={"initial_state": env.state_e.copy()})
+    env.controller_stride = 4
+    env.simulator.dt = env.dt / env.controller_stride
+    torque = action_value * env.params.motor_torque_limit
+    requested, _ = accelerations(env.simulator.get_state(), torque, env.params)
+    commanded = float(np.clip(requested, -100.0, 100.0))
 
-    assert (
-        simulator_step.call_args_list
-        == [call(pytest.approx(0.4 * env.params.motor_torque_limit))]
-        * env.controller_stride
-    )
+    # Run the real integrator so a conversion repeated at each substep is detectable.
+    with patch.object(
+        env.simulator, "step_acceleration", wraps=env.simulator.step_acceleration
+    ) as simulator_step:
+        obs, _, _, _, info = env.step(np.array([action_value]))
+
+    assert simulator_step.call_args_list == [call(commanded)] * env.controller_stride
     assert simulator_step.call_count * env.simulator.dt == pytest.approx(env.dt)
+    assert env.simulator.get_state()[2] == pytest.approx(commanded * env.dt)
+    assert obs[-1] == pytest.approx(action_value)
+    assert info["requested_torque"] == pytest.approx(torque)
+    assert info["requested_acceleration"] == pytest.approx(requested)
+    assert info["commanded_acceleration"] == commanded
+    assert info["acceleration_saturated"] == (abs(requested) > 100.0)
     assert env.steps == 1
 
 
@@ -146,7 +160,7 @@ def test_episode_termination_uses_theta_cutoff(
     )
     env.reset(options={"initial_state": env.state_e.copy()})
 
-    with patch.object(env.simulator, "step"):
+    with patch.object(env.simulator, "step_acceleration"):
         env.step(np.array([0.0], dtype=np.float32))
         assert env.flag_captured
         env.simulator.reset(env.state_e + np.array([0.0, theta_error, 0.0, 0.0]))
@@ -158,7 +172,7 @@ def test_episode_termination_uses_theta_cutoff(
 def test_termination_is_periodic_in_pendulum_angle(env: PendulumEnv) -> None:
     env.simulator.reset(np.array([0.0, -np.pi, 0.0, 0.0]))
 
-    with patch.object(env.simulator, "step"):
+    with patch.object(env.simulator, "step_acceleration"):
         _, _, terminated, _, _ = env.step(np.array([0.0], dtype=np.float32))
 
     assert not terminated
@@ -192,7 +206,7 @@ def test_torque_costs_observation_history_and_reset(env: PendulumEnv):
     env.max_episode_steps = 10
     env.reset(options={"initial_state": env.state_e.copy()})
     limit = env.params.motor_torque_limit
-    with patch.object(env.simulator, "step"):
+    with patch.object(env.simulator, "step_acceleration"):
         for action, coefficient in [(1.0, 15.0), (1.0, 10.0), (-1.0, 30.0)]:
             obs, reward, terminated, truncated, _ = env.step(np.array([action]))
             assert not terminated and not truncated
@@ -207,7 +221,7 @@ def test_torque_costs_observation_history_and_reset(env: PendulumEnv):
 
 def test_capture_latches_and_reset_allows_another_swing_up(env: PendulumEnv):
     env.max_episode_steps = 10
-    with patch.object(env.simulator, "step"):
+    with patch.object(env.simulator, "step_acceleration"):
         env.reset(options={"initial_state": [0.0, 0.0, 0.0, 0.0]})
         assert not env.step(np.array([0.0]))[2]
         assert not env.flag_captured
@@ -226,7 +240,7 @@ def test_capture_latches_and_reset_allows_another_swing_up(env: PendulumEnv):
 @pytest.mark.parametrize("captured", [False, True])
 @pytest.mark.parametrize("phi", [-2 * np.pi - 0.01, 2 * np.pi + 0.01])
 def test_arm_limit_applies_before_and_after_capture(env, captured, phi):
-    with patch.object(env.simulator, "step"):
+    with patch.object(env.simulator, "step_acceleration"):
         env.reset(options={"initial_state": env.state_e.copy()})
         if captured:
             env.step(np.array([0.0]))

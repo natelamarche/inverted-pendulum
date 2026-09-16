@@ -51,3 +51,20 @@ def test_zero_input_keeps_equilibrium_stationary(
     state = simulator.step(torque=0.0)
 
     np.testing.assert_allclose(state, np.zeros(4), atol=1e-12)
+
+
+def test_held_acceleration_follows_analytic_arm_motion(pendulum_params):
+    for acceleration in (-100.0, 0.0, 100.0):
+        simulator = Simulator(pendulum_params, dt=0.001)
+        simulator.reset(np.array([0.2, 0.4, -0.3, 0.5]))
+        for _ in range(100):
+            state = simulator.step_acceleration(acceleration)
+        elapsed = 0.1
+        np.testing.assert_allclose(
+            state[[0, 2]],
+            [0.2 - 0.3 * elapsed + 0.5 * acceleration * elapsed**2,
+             -0.3 + acceleration * elapsed],
+            atol=1e-12,
+        )
+        state[0] = 99.0
+        assert simulator.get_state()[0] != 99.0

@@ -1,6 +1,10 @@
 import numpy as np
 
-from pendulum.dynamics.model import accelerations, state_derivative
+from pendulum.dynamics.model import (
+    accelerations,
+    state_derivative,
+    state_derivative_acceleration,
+)
 from pendulum.dynamics.parameters import PendulumParameters
 
 
@@ -96,3 +100,13 @@ def test_derivative_remains_finite_over_reasonable_states(
             derivative = state_derivative(state, torque, pendulum_params)
 
             assert np.all(np.isfinite(derivative))
+
+
+def test_acceleration_input_matches_instantaneous_torque_dynamics(pendulum_params):
+    rng = np.random.default_rng(42)
+    for _ in range(50):
+        state = rng.uniform(-3.0, 3.0, size=4)
+        torque = rng.uniform(-0.5, 0.5)
+        expected = state_derivative(state, torque, pendulum_params)
+        actual = state_derivative_acceleration(state, expected[2], pendulum_params)
+        np.testing.assert_allclose(actual, expected, atol=1e-12)
