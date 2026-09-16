@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+from threading import Lock
+from types import TracebackType
 import numpy as np
 import serial
 
@@ -23,11 +25,12 @@ class HardwarePendulum:
             port,
             baudrate=baudrate,
             timeout=0,
-            write_timeout=0.02,
+            write_timeout=0.1,
         )
         
         self.state_estimator = state_estimator
         self.control_period = control_period
+        self._write_lock = Lock()
         
         self._rx_buffer = bytearray()
         self._discarding_line = False
@@ -226,12 +229,18 @@ class HardwarePendulum:
         
     def _write_command(self, command: str) -> None:
         data = f"{command}\r".encode("ascii")
-        try:
-            if self.serial.write(data) != len(data):
-                raise IOError("Incomplete serial command")
-        except (OSError, serial.SerialException):
-            self._invalidate_session()
-            raise
+        with self._write_lock:
+            try:
+                # ST-Link transport workaround: pace small chunks, including
+                # the final chunk so the next command also has a gap.
+                for offset in range(0, len(data), 7):
+                    chunk = data[offset:offset + 7]
+                    if self.serial.write(chunk) != len(chunk):
+                        raise IOError("Incomplete serial command")
+                    time.sleep(0.001)
+            except (OSError, serial.SerialException):
+                self._invalidate_session()
+                raise
     
     def close(self) -> None:
         if not self.serial.is_open:
@@ -245,5 +254,15 @@ class HardwarePendulum:
     def __enter__(self) -> HardwarePendulum:
         return self
     
-    def __exit__(self, *args: object) -> None:
-        self.close()
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        try:
+            self.close()
+        except Exception as close_error:
+            if exc_value is None:
+                raise
+            exc_value.add_note(f"Hardware cleanup also failed: {close_error!r}")
