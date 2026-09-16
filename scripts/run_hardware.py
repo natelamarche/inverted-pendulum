@@ -6,7 +6,7 @@ import numpy as np
 
 from pendulum.controllers.rl import RLController
 from pendulum.controllers.lqr import LQRController
-from pendulum.dynamics.model import accelerations
+from pendulum.dynamics.actuation import torque_to_acceleration_command
 from pendulum.hardware.interface import HardwarePendulum
 from pendulum.hardware.state_estimator import StateEstimator
 from train_rl import make_env
@@ -66,8 +66,7 @@ def main() -> None:
                 action = controller.get_action(observation)
                 torque = action * params.motor_torque_limit
                 # The policy requests torque; the hardware accepts acceleration.
-                acceleration, _ = accelerations(state, torque, params)
-                acceleration = min(100.0, max(acceleration, -100.0))
+                _, acceleration = torque_to_acceleration_command(state, torque, params)
                 if first_action:
                     hardware.start(acceleration)
                     first_action = False
