@@ -60,3 +60,22 @@ def accelerations(
     derivative = state_derivative(state, torque, params)
 
     return (derivative[2], derivative[3])
+
+
+def state_derivative_acceleration(
+    state: np.ndarray, arm_acceleration: float, params: PendulumParameters
+) -> np.ndarray:
+    _, theta, phi_dot, theta_dot = state
+    m = params.pendulum_mass
+    lp = params.pendulum_com_length
+    sin_theta, cos_theta = np.sin(theta), np.cos(theta)
+    B = params.pendulum_com_inertia + m * lp**2
+    C = m * params.arm_length * lp * cos_theta
+    h2 = (
+        -m * lp**2 * sin_theta * cos_theta * phi_dot**2
+        + m * params.gravity * lp * sin_theta
+    )
+    theta_ddot = (
+        -h2 - params.pendulum_damping * theta_dot - C * arm_acceleration
+    ) / B
+    return np.array([phi_dot, theta_dot, arm_acceleration, theta_ddot])
