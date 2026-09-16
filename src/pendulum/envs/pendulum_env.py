@@ -97,8 +97,9 @@ class PendulumEnv(gym.Env):
         )
 
         requested_acceleration, commanded_acceleration = torque_to_acceleration_command(
-            self.simulator.get_state(), torque, self.params
+            self.simulator.get_state(), torque, self.params, self.dt
         )
+        
         for _ in range(self.controller_stride):
             self.simulator.step_acceleration(commanded_acceleration)
 

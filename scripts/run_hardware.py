@@ -66,7 +66,7 @@ def main() -> None:
                 action = controller.get_action(observation)
                 torque = action * params.motor_torque_limit
                 # The policy requests torque; the hardware accepts acceleration.
-                _, acceleration = torque_to_acceleration_command(state, torque, params)
+                _, acceleration = torque_to_acceleration_command(state, torque, params, period)
                 if first_action:
                     hardware.start(acceleration)
                     first_action = False
