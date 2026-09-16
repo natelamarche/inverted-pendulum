@@ -4,6 +4,7 @@ import time
 import numpy as np
 import serial
 
+from pendulum.dynamics.actuation import ACCELERATION_LIMIT
 from .state_estimator import StateEstimator
 
 PENDULUM_COUNTS_PER_DEGREE = 6.666667
@@ -186,8 +187,8 @@ class HardwarePendulum:
         if not np.isfinite(acceleration):
             raise ValueError("Acceleration must be finite")
         
-        if abs(acceleration) > 100.0:
-            raise ValueError("Acceleration must be within ±100 rad/s²")
+        if abs(acceleration) > ACCELERATION_LIMIT:
+            raise ValueError(f"Acceleration must be within ±{ACCELERATION_LIMIT:g} rad/s²")
 
         self._sequence = 1
 
@@ -205,9 +206,9 @@ class HardwarePendulum:
             self.stop()
             raise ValueError("Acceleration must be finite")
 
-        if abs(acceleration) > 100.0:
+        if abs(acceleration) > ACCELERATION_LIMIT:
             self.stop()
-            raise ValueError("Acceleration must be within ±100 rad/s²")
+            raise ValueError(f"Acceleration must be within ±{ACCELERATION_LIMIT:g} rad/s²")
         
         self._sequence += 1
 
