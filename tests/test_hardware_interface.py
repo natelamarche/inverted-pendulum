@@ -7,6 +7,7 @@ import serial
 
 from pendulum.hardware.interface import MAX_LINE_BYTES, HardwarePendulum
 from pendulum.hardware.state_estimator import StateEstimator
+from pendulum.hardware.diagnostics import FirmwareStoppedError
 
 
 class FakeSerial:
@@ -45,6 +46,82 @@ def hardware(monkeypatch):
         lambda *args, **kwargs: connection,
     )
     return HardwarePendulum("fake", StateEstimator(velocity_smoothing=0))
+
+
+@pytest.mark.parametrize("prefix", ["EVENT,STOP", "STATUS"])
+@pytest.mark.parametrize("reason", [
+    "WATCHDOG", "SPEED_LIMIT", "POSITION_LIMIT", "INVALID_COMMAND",
+    "LOOP_OVERRUN", "HOST_STOP",
+])
+def test_stop_diagnostic_exits_run_and_survives_cleanup_failure(hardware, prefix, reason):
+    hardware._running = hardware._zeroed = True
+    raw = f"{prefix},1,0,1,{reason},1,42,2,67417,5953,123,9876"
+    hardware.serial.rx.extend(b"2 0 0 0 0 0 0 0 0\n" + raw.encode() + b"\r\n")
+    hardware.serial.on_write.side_effect = serial.SerialTimeoutException("Write timeout")
+    with pytest.raises(FirmwareStoppedError) as raised, hardware:
+        hardware.read_state()
+    diagnostic = raised.value.diagnostic
+    assert diagnostic is hardware.last_stop_diagnostic
+    assert diagnostic.reason == reason
+    assert diagnostic.sequence == 42
+    assert diagnostic.age_ms == 2
+    assert diagnostic.acceleration == 67.417
+    assert diagnostic.speed == 5.953
+    assert diagnostic.rotor_steps == 123
+    assert diagnostic.stop_tick_ms == 9876
+    assert raw in str(raised.value)
+    assert "cleanup also failed" in raised.value.__notes__[0]
+    assert hardware.serial.commands == [b"STOP\r"]
+    assert not hardware.serial.is_open
+    assert not hardware._running and not hardware._zeroed
+
+
+def test_status_logs_and_fragmented_event_stops_run(hardware, caplog):
+    hardware._running = True
+    status = b"STATUS,1,1,0,NONE,1,0,2,-1000,-2000,-123,0"
+    hardware.serial.rx.extend(status + b"\r\n2 0 0 0 0 0 0 0 0\nEVENT,ST")
+    with caplog.at_level("INFO"):
+        np.testing.assert_array_equal(hardware.read_state(), np.zeros(4))
+    assert status.decode() in caplog.text
+    assert hardware.last_diagnostic.sequence == 0
+    assert hardware.last_diagnostic.speed == -2
+    assert hardware._running
+    hardware.serial.rx.extend(b"OP,1,0,1,WATCHDOG,1,42,50,100000,5400,123,9876\n")
+    with pytest.raises(FirmwareStoppedError, match="WATCHDOG"):
+        hardware.read_state()
+
+
+@pytest.mark.parametrize("queued", [False, True])
+def test_zero_preserves_diagnostics_before_command_and_during_ack_wait(hardware, queued):
+    raw = b"STATUS,1,0,1,SPEED_LIMIT,1,42,2,67417,5953,123,9876"
+    if queued:
+        hardware.serial.rx.extend(raw + b"\nACK,ZERO\n")
+
+    def acknowledge():
+        if queued:
+            assert hardware.last_stop_diagnostic.raw == raw.decode()
+        else:
+            hardware.serial.rx.extend(raw + b"\n")
+        hardware.serial.rx.extend(b"ACK,ZERO\n2 0 0 0 0 0 0 0 0\n")
+
+    hardware.serial.on_write.side_effect = acknowledge
+    hardware.zero()
+    assert hardware._zeroed
+    assert hardware.last_stop_diagnostic.raw == raw.decode()
+    np.testing.assert_array_equal(hardware.read_state(), np.zeros(4))
+
+
+@pytest.mark.parametrize("raw", [
+    b"STATUS,2,0,1,WATCHDOG,1,42,50,100000,5400,123,9876",
+    b"EVENT,STOP,1,0,1,WATCHDOG",
+    b"STATUS,1,0,1,WATCHDOG,1,42,bad,100000,5400,123,9876",
+    b"STATUS,\xff",
+])
+def test_bad_diagnostics_are_logged_and_telemetry_continues(hardware, caplog, raw):
+    hardware.serial.rx.extend(raw + b"\n2 0 0 0 0 0 0 0 0\n")
+    np.testing.assert_array_equal(hardware.read_state(), np.zeros(4))
+    assert "Invalid firmware diagnostic" in caplog.text
+    assert hardware.last_diagnostic is None
 
 
 def test_close_stops_after_start_was_sent_but_write_failed(hardware):
