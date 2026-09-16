@@ -1,6 +1,7 @@
 import gymnasium as gym
 import numpy as np
 
+from pendulum.dynamics.actuation import torque_to_acceleration_command
 from pendulum.dynamics.parameters import PendulumParameters
 from pendulum.simulation.simulator import Simulator
 
@@ -95,8 +96,11 @@ class PendulumEnv(gym.Env):
             )
         )
 
+        requested_acceleration, commanded_acceleration = torque_to_acceleration_command(
+            self.simulator.get_state(), torque, self.params
+        )
         for _ in range(self.controller_stride):
-            self.simulator.step(torque)
+            self.simulator.step_acceleration(commanded_acceleration)
 
         self.steps += 1
 
@@ -129,7 +133,13 @@ class PendulumEnv(gym.Env):
         self.previous_torque = float(torque)
         observation = self._get_observation()
 
-        return observation, reward, terminated, truncated, {}
+        info = {
+            "requested_torque": torque,
+            "requested_acceleration": requested_acceleration,
+            "commanded_acceleration": commanded_acceleration,
+            "acceleration_saturated": requested_acceleration != commanded_acceleration,
+        }
+        return observation, reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
         phi, theta, phi_dot, theta_dot = self.simulator.get_state()

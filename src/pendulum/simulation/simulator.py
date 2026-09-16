@@ -2,7 +2,7 @@ import numpy as np
 
 from pendulum.dynamics.parameters import PendulumParameters
 
-from .integrators import rk4_step
+from .integrators import rk4_step, rk4_step_acceleration
 
 
 class Simulator:
@@ -28,6 +28,12 @@ class Simulator:
         )
 
         self.state = rk4_step(self.state, torque, self.dt, self.params)
+        return self.state.copy()
+
+    def step_acceleration(self, arm_acceleration: float) -> np.ndarray:
+        self.state = rk4_step_acceleration(
+            self.state, arm_acceleration, self.dt, self.params
+        )
         return self.state.copy()
 
     def get_state(self) -> np.ndarray:
