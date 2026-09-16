@@ -75,7 +75,5 @@ def state_derivative_acceleration(
         -m * lp**2 * sin_theta * cos_theta * phi_dot**2
         + m * params.gravity * lp * sin_theta
     )
-    theta_ddot = (
-        -h2 - params.pendulum_damping * theta_dot - C * arm_acceleration
-    ) / B
+    theta_ddot = (-h2 - params.pendulum_damping * theta_dot - C * arm_acceleration) / B
     return np.array([phi_dot, theta_dot, arm_acceleration, theta_ddot])

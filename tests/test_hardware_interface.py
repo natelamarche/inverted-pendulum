@@ -49,15 +49,26 @@ def hardware(monkeypatch):
 
 
 @pytest.mark.parametrize("prefix", ["EVENT,STOP", "STATUS"])
-@pytest.mark.parametrize("reason", [
-    "WATCHDOG", "SPEED_LIMIT", "POSITION_LIMIT", "INVALID_COMMAND",
-    "LOOP_OVERRUN", "HOST_STOP",
-])
-def test_stop_diagnostic_exits_run_and_survives_cleanup_failure(hardware, prefix, reason):
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "WATCHDOG",
+        "SPEED_LIMIT",
+        "POSITION_LIMIT",
+        "INVALID_COMMAND",
+        "LOOP_OVERRUN",
+        "HOST_STOP",
+    ],
+)
+def test_stop_diagnostic_exits_run_and_survives_cleanup_failure(
+    hardware, prefix, reason
+):
     hardware._running = hardware._zeroed = True
     raw = f"{prefix},1,0,1,{reason},1,42,2,67417,5953,123,9876"
     hardware.serial.rx.extend(b"2 0 0 0 0 0 0 0 0\n" + raw.encode() + b"\r\n")
-    hardware.serial.on_write.side_effect = serial.SerialTimeoutException("Write timeout")
+    hardware.serial.on_write.side_effect = serial.SerialTimeoutException(
+        "Write timeout"
+    )
     with pytest.raises(FirmwareStoppedError) as raised, hardware:
         hardware.read_state()
     diagnostic = raised.value.diagnostic
@@ -92,7 +103,9 @@ def test_status_logs_and_fragmented_event_stops_run(hardware, caplog):
 
 
 @pytest.mark.parametrize("queued", [False, True])
-def test_zero_preserves_diagnostics_before_command_and_during_ack_wait(hardware, queued):
+def test_zero_preserves_diagnostics_before_command_and_during_ack_wait(
+    hardware, queued
+):
     raw = b"STATUS,1,0,1,SPEED_LIMIT,1,42,2,67417,5953,123,9876"
     if queued:
         hardware.serial.rx.extend(raw + b"\nACK,ZERO\n")
@@ -111,12 +124,15 @@ def test_zero_preserves_diagnostics_before_command_and_during_ack_wait(hardware,
     np.testing.assert_array_equal(hardware.read_state(), np.zeros(4))
 
 
-@pytest.mark.parametrize("raw", [
-    b"STATUS,2,0,1,WATCHDOG,1,42,50,100000,5400,123,9876",
-    b"EVENT,STOP,1,0,1,WATCHDOG",
-    b"STATUS,1,0,1,WATCHDOG,1,42,bad,100000,5400,123,9876",
-    b"STATUS,\xff",
-])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"STATUS,2,0,1,WATCHDOG,1,42,50,100000,5400,123,9876",
+        b"EVENT,STOP,1,0,1,WATCHDOG",
+        b"STATUS,1,0,1,WATCHDOG,1,42,bad,100000,5400,123,9876",
+        b"STATUS,\xff",
+    ],
+)
 def test_bad_diagnostics_are_logged_and_telemetry_continues(hardware, caplog, raw):
     hardware.serial.rx.extend(raw + b"\n2 0 0 0 0 0 0 0 0\n")
     np.testing.assert_array_equal(hardware.read_state(), np.zeros(4))
@@ -135,7 +151,9 @@ def test_close_stops_after_start_was_sent_but_write_failed(hardware):
     assert not hardware.serial.is_open
 
 
-@pytest.mark.parametrize("command", ["ZERO", "STOP", "START,1,-10.000000", "A,27,-10.000000"])
+@pytest.mark.parametrize(
+    "command", ["ZERO", "STOP", "START,1,-10.000000", "A,27,-10.000000"]
+)
 def test_command_chunks_are_paced(hardware, monkeypatch, command):
     events = []
     hardware.serial.on_write.side_effect = lambda: events.append(
@@ -168,9 +186,13 @@ def test_concurrent_commands_do_not_interleave(hardware):
     assert sorted(received[:-1]) == sorted(commands)
 
 
-@pytest.mark.parametrize("original", [RuntimeError("control failed"), KeyboardInterrupt()])
+@pytest.mark.parametrize(
+    "original", [RuntimeError("control failed"), KeyboardInterrupt()]
+)
 def test_cleanup_failure_preserves_original_exception(hardware, original):
-    hardware.serial.on_write.side_effect = serial.SerialTimeoutException("Write timeout")
+    hardware.serial.on_write.side_effect = serial.SerialTimeoutException(
+        "Write timeout"
+    )
 
     with pytest.raises(type(original)) as raised, hardware:
         raise original
@@ -249,7 +271,9 @@ def test_zero_handles_fragmented_ack_and_partial_following_telemetry(hardware):
 
 
 @pytest.mark.parametrize("response", [b"", b"ACK,OTHER\r\n", b"ACK,ZERO\r"])
-def test_zero_times_out_without_complete_ack_and_preserves_estimator(hardware, response):
+def test_zero_times_out_without_complete_ack_and_preserves_estimator(
+    hardware, response
+):
     hardware.state_estimator.reset = Mock()
     hardware._measurement_time = 1.0
     hardware._sequence = 7
@@ -307,7 +331,9 @@ def test_telemetry_timeout_stops_and_invalidates_session(hardware, stop_fails):
         hardware.start()
 
 
-@pytest.mark.parametrize("operation", ["read", "waiting", "write", "short_write", "reset"])
+@pytest.mark.parametrize(
+    "operation", ["read", "waiting", "write", "short_write", "reset"]
+)
 def test_serial_failure_invalidates_session(hardware, monkeypatch, operation):
     hardware._running = hardware._zeroed = True
     failure = OSError("serial failed")
@@ -316,7 +342,9 @@ def test_serial_failure_invalidates_session(hardware, monkeypatch, operation):
         hardware.serial.read = Mock(side_effect=failure)
         action = hardware.read_state
     elif operation == "waiting":
-        monkeypatch.setattr(FakeSerial, "in_waiting", property(Mock(side_effect=failure)))
+        monkeypatch.setattr(
+            FakeSerial, "in_waiting", property(Mock(side_effect=failure))
+        )
         action = hardware.read_state
     elif operation == "reset":
         hardware._running = False
@@ -360,8 +388,7 @@ def test_zero_discards_oversized_ack_suffix_and_accepts_next_line(hardware):
     assert not hardware._zeroed
 
     hardware.serial.on_write.side_effect = lambda: hardware.serial.rx.extend(
-        b"x" * (MAX_LINE_BYTES * 2) + b"\nACK,ZERO\r\n"
-        b"2 0 0 0 0 0 0 0 0\n"
+        b"x" * (MAX_LINE_BYTES * 2) + b"\nACK,ZERO\r\n2 0 0 0 0 0 0 0 0\n"
     )
     hardware.zero()
     assert hardware._zeroed

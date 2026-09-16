@@ -8,8 +8,7 @@ estimator = StateEstimator(
 )
 
 with HardwarePendulum(
-    port="/dev/cu.usbmodem103",
-    state_estimator=estimator
+    port="/dev/cu.usbmodem103", state_estimator=estimator
 ) as hardware:
     while True:
         state = hardware.read_state()

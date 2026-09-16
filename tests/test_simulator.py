@@ -62,8 +62,10 @@ def test_held_acceleration_follows_analytic_arm_motion(pendulum_params):
         elapsed = 0.1
         np.testing.assert_allclose(
             state[[0, 2]],
-            [0.2 - 0.3 * elapsed + 0.5 * acceleration * elapsed**2,
-             -0.3 + acceleration * elapsed],
+            [
+                0.2 - 0.3 * elapsed + 0.5 * acceleration * elapsed**2,
+                -0.3 + acceleration * elapsed,
+            ],
             atol=1e-12,
         )
         state[0] = 99.0

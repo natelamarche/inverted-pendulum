@@ -45,7 +45,7 @@ class StateEstimator:
 
         if not np.all(np.isfinite([phi, theta, timestamp])):
             raise ValueError("Angles and timestamps must be finite")
-        
+
         if self._previous_timestamp is None:
             self._store(phi, theta, timestamp)
 
@@ -71,15 +71,9 @@ class StateEstimator:
 
         alpha = self.velocity_smoothing
 
-        self._phi_dot = (
-            alpha * self._phi_dot
-            + (1.0 - alpha) * raw_phi_dot
-        )
+        self._phi_dot = alpha * self._phi_dot + (1.0 - alpha) * raw_phi_dot
 
-        self._theta_dot = (
-            alpha * self._theta_dot
-            + (1.0 - alpha) * raw_theta_dot
-        )
+        self._theta_dot = alpha * self._theta_dot + (1.0 - alpha) * raw_theta_dot
 
         self._store(phi, theta, timestamp)
 
@@ -106,7 +100,7 @@ class StateEstimator:
         phi: float,
         theta: float,
         timestamp: float,
-    ) -> None:        
+    ) -> None:
         self._previous_phi = phi
         self._previous_theta = theta
         self._previous_timestamp = timestamp

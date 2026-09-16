@@ -17,13 +17,14 @@ PENDULUM_COUNTS_PER_DEGREE = 6.666667
 ROTOR_MICROSTEPS_PER_DEGREE = 8.888889
 MAX_LINE_BYTES = 1024
 
+
 class HardwarePendulum:
     def __init__(
-        self, 
-        port: str, 
+        self,
+        port: str,
         state_estimator: StateEstimator,
         baudrate: int = 230400,
-        control_period: float  = 0.002,
+        control_period: float = 0.002,
     ):
         self.serial = serial.Serial(
             port,
@@ -31,21 +32,21 @@ class HardwarePendulum:
             timeout=0,
             write_timeout=0.1,
         )
-        
+
         self.state_estimator = state_estimator
         self.control_period = control_period
         self._write_lock = Lock()
-        
+
         self._rx_buffer = bytearray()
         self._discarding_line = False
         self._measurement_time = 0.0
-        
+
         self._sequence = 0
         self._running = False
         self._zeroed = False
         self.last_diagnostic: FirmwareDiagnostic | None = None
         self.last_stop_diagnostic: FirmwareDiagnostic | None = None
-        
+
         self.serial.reset_input_buffer()
 
     def read_state(self, timeout: float = 0.1) -> np.ndarray:
@@ -92,7 +93,7 @@ class HardwarePendulum:
             newline = self._rx_buffer.find(b"\n")
             if newline >= 0:
                 line = bytes(self._rx_buffer[:newline])
-                del self._rx_buffer[:newline + 1]
+                del self._rx_buffer[: newline + 1]
                 if self._discarding_line or len(line) > MAX_LINE_BYTES:
                     self._discarding_line = False
                     continue
@@ -134,13 +135,9 @@ class HardwarePendulum:
         except ValueError:
             return None
 
-        theta = np.deg2rad(
-            pendulum_counts / PENDULUM_COUNTS_PER_DEGREE
-        )
+        theta = np.deg2rad(pendulum_counts / PENDULUM_COUNTS_PER_DEGREE)
 
-        phi = np.deg2rad(
-            rotor_microsteps / ROTOR_MICROSTEPS_PER_DEGREE
-        )
+        phi = np.deg2rad(rotor_microsteps / ROTOR_MICROSTEPS_PER_DEGREE)
 
         self._measurement_time += self.control_period
 
@@ -149,7 +146,7 @@ class HardwarePendulum:
             theta=theta,
             timestamp=self._measurement_time,
         )
-    
+
     def _handle_diagnostic(self, line: bytes) -> bool:
         if not line.startswith((b"EVENT,STOP,", b"STATUS,")):
             return False
@@ -161,7 +158,8 @@ class HardwarePendulum:
         self.last_diagnostic = diagnostic
         logger.log(
             logging.WARNING if diagnostic.stopped else logging.INFO,
-            "Firmware: %s", diagnostic.raw,
+            "Firmware: %s",
+            diagnostic.raw,
         )
         if diagnostic.stopped:
             self.last_stop_diagnostic = diagnostic
@@ -218,25 +216,25 @@ class HardwarePendulum:
             time.sleep(min(0.0005, max(0.0, deadline - time.monotonic())))
 
         raise TimeoutError("Timed out waiting for ACK,ZERO")
-    
+
     def start(self, acceleration: float = 0.0) -> None:
         if self._running:
             raise RuntimeError("Pendulum is already running")
 
         if not self._zeroed:
             raise RuntimeError("Call zero() successfully before starting")
-        
+
         if not np.isfinite(acceleration):
             raise ValueError("Acceleration must be finite")
-        
+
         if abs(acceleration) > ACCELERATION_LIMIT:
-            raise ValueError(f"Acceleration must be within ±{ACCELERATION_LIMIT:g} rad/s²")
+            raise ValueError(
+                f"Acceleration must be within ±{ACCELERATION_LIMIT:g} rad/s²"
+            )
 
         self._sequence = 1
 
-        self._write_command(
-            f"START,{self._sequence},{acceleration:.6f}"
-        )
+        self._write_command(f"START,{self._sequence},{acceleration:.6f}")
 
         self._running = True
 
@@ -250,14 +248,14 @@ class HardwarePendulum:
 
         if abs(acceleration) > ACCELERATION_LIMIT:
             self.stop()
-            raise ValueError(f"Acceleration must be within ±{ACCELERATION_LIMIT:g} rad/s²")
-        
+            raise ValueError(
+                f"Acceleration must be within ±{ACCELERATION_LIMIT:g} rad/s²"
+            )
+
         self._sequence += 1
 
-        self._write_command(
-            f"A,{self._sequence},{acceleration:.6f}"
-        )
-    
+        self._write_command(f"A,{self._sequence},{acceleration:.6f}")
+
     def stop(self) -> None:
         try:
             if self.serial.is_open:
@@ -265,7 +263,7 @@ class HardwarePendulum:
         finally:
             self._running = False
             self._zeroed = False
-        
+
     def _write_command(self, command: str) -> None:
         data = f"{command}\r".encode("ascii")
         with self._write_lock:
@@ -273,26 +271,26 @@ class HardwarePendulum:
                 # ST-Link transport workaround: pace small chunks, including
                 # the final chunk so the next command also has a gap.
                 for offset in range(0, len(data), 7):
-                    chunk = data[offset:offset + 7]
+                    chunk = data[offset : offset + 7]
                     if self.serial.write(chunk) != len(chunk):
-                        raise IOError("Incomplete serial command")
+                        raise OSError("Incomplete serial command")
                     time.sleep(0.001)
             except (OSError, serial.SerialException):
                 self._invalidate_session()
                 raise
-    
+
     def close(self) -> None:
         if not self.serial.is_open:
             return
-        
+
         try:
             self.stop()
         finally:
             self.serial.close()
-            
+
     def __enter__(self) -> HardwarePendulum:
         return self
-    
+
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
