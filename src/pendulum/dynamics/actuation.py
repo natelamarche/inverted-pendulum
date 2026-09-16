@@ -15,7 +15,15 @@ def torque_to_acceleration_command(
 ) -> tuple[float, float]:
     """Return requested and clipped arm acceleration for one control interval."""
     requested, _ = accelerations(state, torque, params)
-    min_acceleration = max(-acceleration_limit, (-6.0 - state[2] / dt))
-    max_acceleration = min(acceleration_limit, (6.0 - state[2]) / dt)
+    min_acceleration = float(np.clip(
+        (-SPEED_LIMIT - state[2]) / dt,
+        -acceleration_limit,
+        acceleration_limit,
+    ))
+    max_acceleration = float(np.clip(
+        (SPEED_LIMIT - state[2]) / dt,
+        -acceleration_limit,
+        acceleration_limit
+    ))
     commanded = float(np.clip(requested, min_acceleration, max_acceleration))
     return float(requested), commanded
