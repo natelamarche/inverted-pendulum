@@ -4,7 +4,7 @@ from .model import accelerations
 from .parameters import PendulumParameters
 
 ACCELERATION_LIMIT = 100.0  # Arm acceleration, rad/s².
-SPEED_LIMIT = 6.0 # Arm speed rad/s
+SPEED_LIMIT = 5.0 # Arm speed rad/s
 
 def torque_to_acceleration_command(
     state: np.ndarray,
