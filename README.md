@@ -2,6 +2,10 @@
 
 A Python project for simulating and controlling a rotary inverted pendulum. It combines nonlinear dynamics, classical LQR control, and a custom PyTorch reinforcement learning pipeline for swing-up and balancing experiments, with an interactive 3D viewer and a serial interface for running learned policies on physical hardware.
 
+## Demo
+
+[▶ Watch the hardware demo](https://www.youtube.com/watch?v=Agkeckp2kVY)
+
 ## Highlights
 
 - Coupled arm and pendulum dynamics with gravity, damping, and fourth-order Runge–Kutta integration
